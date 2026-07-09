@@ -1239,6 +1239,149 @@ function initialize() {
 }
 
 // ============================================================
+// load50Questions: 50개 문제 로드 (API 호출)
+// ============================================================
+async function load50Questions(uiStartNumber) {
+  if (TOTAL_QUESTIONS === 0) await detectTotalQuestions();
+  try {
+    var url = ORIGINAL_API_URL + '?start=' + uiStartNumber + '&limit=' + QUESTIONS_PER_SET;
+    console.log('📡 Requesting questions (direct):', url);
+    
+    var response = await fetch(url);
+    console.log('📡 Response status:', response.status);
+    
+    if (!response.ok) {
+      throw new Error('HTTP ' + response.status);
+    }
+    
+    var text = await response.text();
+    console.log('📡 Response text (first 200 chars):', text.substring(0, 200));
+    
+    if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+      console.error('❌ Received HTML. Check Apps Script deployment.');
+      throw new Error('HTML response - check Apps Script URL');
+    }
+    
+    var data = JSON.parse(text);
+    console.log('📡 Response type:', typeof data);
+    console.log('📡 Is array?', Array.isArray(data));
+    
+    var questionsData = [];
+    
+    if (Array.isArray(data)) {
+      questionsData = data;
+      console.log('✅ Data is direct array, length:', questionsData.length);
+    } else if (data && typeof data === 'object') {
+      if (Array.isArray(data.data)) {
+        questionsData = data.data;
+        console.log('✅ Found data.data array, length:', questionsData.length);
+      } else if (Array.isArray(data.questions)) {
+        questionsData = data.questions;
+        console.log('✅ Found data.questions array, length:', questionsData.length);
+      } else if (Array.isArray(data.items)) {
+        questionsData = data.items;
+        console.log('✅ Found data.items array, length:', questionsData.length);
+      } else {
+        var keys = Object.keys(data);
+        if (keys.length > 0) {
+          questionsData = keys.map(function(key) {
+            var item = data[key];
+            if (typeof item === 'object' && item !== null) {
+              item._key = key;
+              return item;
+            }
+            return { question: String(item), answer: '1', _key: key };
+          });
+          console.log('✅ Converted object to array, length:', questionsData.length);
+        }
+      }
+    }
+    
+    if (!Array.isArray(questionsData) || questionsData.length === 0) {
+      console.error('❌ No questions data found');
+      throw new Error('No question data received');
+    }
+    
+    console.log('✅ Processing ' + questionsData.length + ' questions');
+    
+    var processed = [];
+    for (var idx = 0; idx < questionsData.length; idx++) {
+      try {
+        var item = questionsData[idx];
+        var parsed = item;
+        
+        if (typeof item === 'string') {
+          try {
+            parsed = JSON.parse(item);
+          } catch(e) {
+            parsed = { question: item, answer: '1' };
+          }
+        }
+        
+        if (!parsed || typeof parsed !== 'object') {
+          parsed = { question: String(item), answer: '1' };
+        }
+        
+        var questionText = parsed.Q || parsed.question || parsed.q || parsed.문제 || parsed.text || 'Question ' + (uiStartNumber + idx);
+        var passageText = parsed.passage || parsed.P || parsed.p || parsed.지문 || '';
+        
+        var choices = {};
+        choices['1'] = parsed['1'] || '';
+        choices['2'] = parsed['2'] || '';
+        choices['3'] = parsed['3'] || '';
+        choices['4'] = parsed['4'] || '';
+        
+        var finalAnswer = '1';
+        if (parsed.A !== undefined && parsed.A !== null && parsed.A !== "") {
+          finalAnswer = String(parsed.A).trim();
+        } else if (parsed.answer !== undefined && parsed.answer !== null && parsed.answer !== "") {
+          finalAnswer = String(parsed.answer).trim();
+        } else if (parsed.정답 !== undefined && parsed.정답 !== null && parsed.정답 !== "") {
+          finalAnswer = String(parsed.정답).trim();
+        } else if (parsed.a !== undefined && parsed.a !== null && parsed.a !== "") {
+          finalAnswer = String(parsed.a).trim();
+        }
+        
+        var originalNumber = parsed.N || parsed.originalNumber || parsed.n || (uiStartNumber + idx);
+        
+        processed.push({
+          N: originalNumber,
+          question: questionText,
+          passage: passageText,
+          choices: choices,
+          answer: finalAnswer,
+          explanation: parsed.explanation || parsed.E || parsed.e || parsed.해설 || 'No explanation available.',
+          graphic: parsed.graphic || parsed.G || parsed.g || parsed.그래픽 || parsed.P_graph || '',
+          originalNumber: originalNumber,
+          A: parsed.A || parsed.answer || parsed.정답 || ''
+        });
+        
+        if (idx === 0) {
+          console.log('📝 First question mapped:', processed[0]);
+        }
+      } catch(e) {
+        console.warn('⚠️ Parse error for item', idx, ':', e);
+      }
+    }
+    
+    if (processed.length === 0) {
+      console.error('❌ No questions could be parsed');
+      throw new Error('No valid question data');
+    }
+    
+    console.log('✅ Successfully parsed ' + processed.length + ' questions');
+    console.log('📝 First question preview:', processed[0]);
+    return processed;
+  } catch(err) {
+    console.error('❌ Load failed:', err);
+    return [];
+  }
+}
+
+
+
+
+// ============================================================
 // B013: startQuizWithNumber 함수
 // ============================================================
 async function startQuizWithNumber(uiStartNumber) {
