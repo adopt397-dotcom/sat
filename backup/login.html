@@ -363,32 +363,37 @@
     <!-- JS-0440: 탭 전환 -->
     <script>
         function initTabs() {
-            const tabs = document.querySelectorAll('.tab-btn');
-            const contents = {
-                loginTab: document.getElementById('loginTab'),
-                signupTab: document.getElementById('signupTab'),
-                changeTab: document.getElementById('changeTab')
-            };
+    const tabs = document.querySelectorAll('.tab-btn');
+    const contents = {
+        loginTab: document.getElementById('loginTab'),
+        signupTab: document.getElementById('signupTab'),
+        changeTab: document.getElementById('changeTab')
+    };
 
-            tabs.forEach(tab => {
-                tab.addEventListener('click', function() {
-                    tabs.forEach(t => t.classList.remove('active'));
-                    this.classList.add('active');
-                    Object.keys(contents).forEach(key => {
-                        contents[key].classList.toggle('form-hidden', key !== this.dataset.tab);
-                    });
-                });
+    tabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            tabs.forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            Object.keys(contents).forEach(key => {
+                contents[key].classList.toggle('form-hidden', key !== this.dataset.tab);
             });
+        });
+    });
 
-            // 하단 링크는 삭제되었으므로 gotoLoginFromSignup 관련 코드 제거
-            const gotoLoginFromChange = document.getElementById('gotoLoginFromChange');
-            if (gotoLoginFromChange) {
-                gotoLoginFromChange.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    document.querySelector('[data-tab="loginTab"]').click();
-                });
+    // 🔥 하단 링크에서 Login 탭으로 이동 (방어 코드 포함)
+    const gotoLoginFromChange = document.getElementById('gotoLoginFromChange');
+    if (gotoLoginFromChange) {
+        gotoLoginFromChange.addEventListener('click', function(e) {
+            e.preventDefault();
+            const loginTab = document.querySelector('[data-tab="loginTab"]');
+            if (loginTab) {
+                loginTab.click();
+            } else {
+                // Login 탭이 없으면 login.html로 이동
+                window.location.href = './login.html';
             }
-        }
+        });
+    }
     </script>
 
     <!-- JS-0450: 로그인 처리 -->
