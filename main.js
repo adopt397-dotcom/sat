@@ -1435,92 +1435,84 @@ function initTimer() {
 }
 
 // ========================================================================
-// BLOCK 1100: 텍스트 렌더링 (원본 B011 autoWrapLatex + Writing 편집)
+// BLOCK 1110: autoWrapLatex (수정본 - 일반 텍스트 오감지 방지)
 // ========================================================================
 function autoWrapLatex(text) {
-  if (!text) return text;
-  if (text.includes('\\(') || text.includes('$')) return text;
-  
-  // 제외 패턴 (과잉 적용 방지)
-  var excludePatterns = [
-    /\[u\].*?\[\/u\]/, /\[s\].*?\[\/s\]/, /\[i\].*?\[\/i\]/,
-    /\[b\].*?\[\/b\]/, /\[em\].*?\[\/em\]/, /\[underline\].*?\[\/underline\]/,
-    /\[\d+\]/, /'re\b/, /'s\b/, /'ll\b/, /'ve\b/, /n't\b/,
-    /'d\b/, /'m\b/, /\bDNA\b/, /\bRNA\b/,
-    /^[A-Z][^\\]*[.!?]\s*$/, /^[A-Za-z0-9\s,.'"!?-]+$/
-  ];
-  for (var i = 0; i < excludePatterns.length; i++) {
-    if (excludePatterns[i].test(text)) return text;
-  }
-  
-  var mathPatterns = [
-    /[a-zA-Z]\^/, /sqrt/, /frac/, /sum/, /int/,
-    /[a-zA-Z]_/, /[0-9]^/, /[a-zA-Z][0-9]/,
-    /\\begin\{[a-z]+\}/, /\\binom\{[^}]+\}\{[^}]+\}/,
-    /\\lim_[^{]+\{[^}]+\}/, /\\int_[^{]+\}\^{[^}]+\}/,
-    /\\sum_[^{]+\}\^{[^}]+\}/, /\\bar\{[^}]+\}/,
-    /\\hat\{[^}]+\}/, /\\sigma/, /\\mu/,
-    /P\([^)]+\)/, /P\([^|]+\|[^)]+\)/,
-    /\\vec\{[^}]+\}/, /\\overrightarrow\{[^}]+\}/,
-    /\\sin\^\{?2\}?/, /\\cos\^\{?2\}?/, /\\tan\^\{?2\}?/
-  ];
-  for (var i = 0; i < mathPatterns.length; i++) {
-    if (mathPatterns[i].test(text)) {
-      return '\\(' + text + '\\)';
-    }
-  }
-  return text;
-}
-
-function renderWithEditingMarks(text, isMath) {
     if (!text) return text;
-    var html = text;
-    html = html.replace(/\[u\](.*?)\[\/u\]/g, '<u>$1</u>');
-    html = html.replace(/\[s\](.*?)\[\/s\]/g, '<del>$1</del>');
-    html = html.replace(/\[i\](.*?)\[\/i\]/g, '<ins>$1</ins>');
-    html = html.replace(/\[b\](.*?)\[\/b\]/g, '<strong>$1</strong>');
-    html = html.replace(/\[em\](.*?)\[\/em\]/g, '<em>$1</em>');
-    html = html.replace(/\[underline\](.*?)\[\/underline\]/g,
-        '<span style="text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:2px;">$1</span>');
-    html = html.replace(/\[(\d+)\]/g,
-        '<sup style="color:#3498db;font-weight:bold;font-size:0.8em;">[$1]</sup>');
+    if (text.includes('\\(') || text.includes('$')) return text;
     
-    if (isMath) {
-        var tagPlaceholders = [];
-        html = html.replace(/<[^>]+>/g, function(match) {
-            tagPlaceholders.push(match);
-            return '%%TAG' + (tagPlaceholders.length - 1) + '%%';
-        });
-        html = autoWrapLatex(html);
-        html = html.replace(/%%TAG(\d+)%%/g, function(match, idx) {
-            return tagPlaceholders[parseInt(idx)] || match;
-        });
-    }
-    return html;
-}
-
-function detectMathQuestion(q) {
-    if (!q) return false;
-    var questionText = q.question || '';
-    var mathIndicators = [
-        /[=≠<>≤≥]/, /[0-9]+[.\s]*[=≠<>≤≥]/, /[a-zA-Z]\^/,
-        /[a-zA-Z]_/, /sqrt|frac|sum|int/, /sin|cos|tan|log|ln/,
-        /[0-9]+\s*[+\-*/]\s*[0-9]+/, /\([^)]+\s*[=≠<>≤≥]\s*[^)]+\)/,
-        /\\[a-zA-Z]+/, /\$.*\$/, /\\\(.*\\\)/
+    // ★ 제외 패턴 (일반 텍스트로 처리)
+    var excludePatterns = [
+        /\[u\].*?\[\/u\]/,
+        /\[s\].*?\[\/s\]/,
+        /\[i\].*?\[\/i\]/,
+        /\[b\].*?\[\/b\]/,
+        /\[em\].*?\[\/em\]/,
+        /\[underline\].*?\[\/underline\]/,
+        /\[\d+\]/,
+        /'re\b/,
+        /'s\b/,
+        /'ll\b/,
+        /'ve\b/,
+        /n't\b/,
+        /'d\b/,
+        /'m\b/,
+        /\bDNA\b/,
+        /\bRNA\b/,
+        // ★★★ 선택지 텍스트 오감지 방지 ★★★
+        /^[a-z]+$/,                    // 소문자만으로 된 단어
+        /^[A-Z][a-z]+$/,               // 첫 글자 대문자 + 소문자
+        /^[A-Z][a-z]+[A-Z][a-z]+/,     // 카멜케이스 (예: iPhone)
+        /^[a-z]+[A-Z][a-z]+/,          // 카멜케이스
+        /^[a-zA-Z]{10,}$/,             // 10자 이상 연속 알파벳 (공백 없는 텍스트)
+        /^[a-zA-Z]+[0-9][a-zA-Z]*$/,   // 알파벳+숫자 조합 (예: phone20)
+        /^[a-zA-Z]*[0-9]+[a-zA-Z]*$/,  // 숫자 포함 텍스트
+        /^[A-Za-z0-9]+$/,              // 공백 없는 영숫자
+        /^[A-Z][^\\]*[.!?]\s*$/,       // 대문자로 시작하는 문장
+        /^[A-Za-z0-9\s,.'"!?-]+$/,     // 일반 문장 (특수문자 없음)
+        /^\S+$/,                       // 공백이 없는 전체 텍스트
     ];
-    for (var i = 0; i < mathIndicators.length; i++) {
-        if (mathIndicators[i].test(questionText)) return true;
-    }
-    if (q.choices) {
-        var choiceValues = Object.values(q.choices);
-        for (var j = 0; j < choiceValues.length; j++) {
-            var choice = String(choiceValues[j] || '');
-            for (var k = 0; k < mathIndicators.length; k++) {
-                if (mathIndicators[k].test(choice)) return true;
-            }
+    
+    for (var i = 0; i < excludePatterns.length; i++) {
+        if (excludePatterns[i].test(text)) {
+            return text;
         }
     }
-    return false;
+    
+    // ★ 수식 패턴 (더 엄격하게)
+    var mathPatterns = [
+        /\\sqrt\{[^}]+\}/,
+        /\\frac\{[^}]+\}\{[^}]+\}/,
+        /\\sum_[^{]+\}\^{[^}]+\}/,
+        /\\int_[^{]+\}\^{[^}]+\}/,
+        /\\lim_[^{]+\}/,
+        /\\binom\{[^}]+\}\{[^}]+\}/,
+        /\\begin\{[a-z]+\}/,
+        /\\bar\{[^}]+\}/,
+        /\\hat\{[^}]+\}/,
+        /\\vec\{[^}]+\}/,
+        /\\overrightarrow\{[^}]+\}/,
+        /\\sin\^\{?2\}?/,
+        /\\cos\^\{?2\}?/,
+        /\\tan\^\{?2\}?/,
+        /\\left\([^)]*\\right\)/,
+        /\\{.*?\\}/,
+        /(?:^|\s)[a-zA-Z]\^\{?[0-9a-zA-Z]+\}?(?:\s|$)/,
+        /(?:^|\s)[a-zA-Z]_\{[0-9a-zA-Z]+\}(?:\s|$)/,
+        /(?:^|\s)[0-9]+\^\{?[0-9]+\}?(?:\s|$)/,
+        /\([^)]+\s*[=≠<>≤≥]\s*[^)]+\)/,
+        /\{[^}]+\s*[=≠<>≤≥]\s*[^}]+\}/,
+        /[=≠<>≤≥]\s*[0-9a-zA-Z]+/,
+        /[0-9]+\s*[+\-*/]\s*[0-9]+/,
+    ];
+    
+    for (var i = 0; i < mathPatterns.length; i++) {
+        if (mathPatterns[i].test(text)) {
+            return '\\(' + text + '\\)';
+        }
+    }
+    
+    return text;
 }
 
 // ========================================================================
