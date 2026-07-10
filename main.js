@@ -3565,7 +3565,7 @@ function initialize() {
 }
 
 // ========================================================================
-// BLOCK 1600: 내보내기 및 전역 노출
+// BLOCK 1600: 내보내기 및 전역 노출 (수정 완료)
 // ========================================================================
 
 // 1. 전역(window) 노출
@@ -3596,6 +3596,14 @@ window.LANG = LANG;
 window.DOM = DOM;
 window.LOADER = LOADER;
 window.RendererManager = RendererManager;
+
+// ★★★★★ 6개 유틸리티 함수 전역 노출 (이 부분이 누락됨!) ★★★★★
+window.escapeHtml = escapeHtml;
+window.getAnswerLetter = getAnswerLetter;
+window.hasRealChoices = hasRealChoices;
+window.isSubjectiveQuestion = isSubjectiveQuestion;
+window.getValidChoiceKeys = getValidChoiceKeys;
+window.randomizeChoicesOnly = randomizeChoicesOnly;
 
 window.currentQuestions = currentQuestions;
 window.userAnswers = userAnswers;
