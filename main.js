@@ -1311,6 +1311,58 @@ function hasRealChoices(q) {
 }
 
 // ========================================================================
+// BLOCK 0810: randomizeChoicesOnly (선택지 랜덤화)
+// ========================================================================
+function randomizeChoicesOnly(q) {
+    if (!q || !q.choices) return q;
+    if (!hasRealChoices(q)) return q;
+    
+    try {
+        var validEntries = Object.entries(q.choices).filter(function(item) {
+            var k = item[0], v = item[1];
+            if (typeof v === 'string') return v && v.trim() !== "";
+            return v !== null && v !== undefined && v !== "";
+        }).map(function(item) {
+            var k = item[0], v = item[1];
+            return { k: parseInt(k), v: String(v) };
+        });
+        
+        if (validEntries.length === 0) return q;
+        
+        var shuffled = validEntries.slice();
+        for (var i = shuffled.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var temp = shuffled[i];
+            shuffled[i] = shuffled[j];
+            shuffled[j] = temp;
+        }
+        
+        var newChoices = {};
+        shuffled.forEach(function(c, idx) {
+            newChoices[idx + 1] = c.v;
+        });
+        
+        var originalAns = parseInt(q.answer);
+        var correctIdx = shuffled.findIndex(function(c) { return c.k == originalAns; });
+        var newAnswer = (correctIdx + 1).toString();
+        
+        // 정답이 유효하지 않으면 원본 유지
+        if (isNaN(correctIdx) || correctIdx < 0) {
+            return q;
+        }
+        
+        return {
+            ...q,
+            choices: newChoices,
+            answer: newAnswer
+        };
+    } catch(e) {
+        console.error("Randomize error:", e);
+        return q;
+    }
+}
+
+// ========================================================================
 // BLOCK 0900: 퀴즈 네비게이션 (원본 B008)
 // ========================================================================
 function goNext() {
