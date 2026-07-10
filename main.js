@@ -3608,16 +3608,15 @@ window.DOM = DOM;
 window.LOADER = LOADER;
 window.RendererManager = RendererManager;
 
-// ★★★★★ 6개 유틸리티 함수 전역 노출 ★★★★★
+// ★★★★★ 7개 유틸리티 함수 전역 노출 ★★★★★
 window.escapeHtml = escapeHtml;
 window.getAnswerLetter = getAnswerLetter;
 window.hasRealChoices = hasRealChoices;
 window.isSubjectiveQuestion = isSubjectiveQuestion;
 window.getValidChoiceKeys = getValidChoiceKeys;
 window.randomizeChoicesOnly = randomizeChoicesOnly;
-
-// ★★★★★ autoWrapLatex 전역 노출 (이 줄 추가!) ★★★★★
 window.autoWrapLatex = autoWrapLatex;
+window.detectMathQuestion = detectMathQuestion;  // ★ 이 줄 추가!
 
 window.currentQuestions = currentQuestions;
 window.userAnswers = userAnswers;
