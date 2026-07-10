@@ -685,7 +685,11 @@ function startAutoSave() {
 }
 
 // ========================================================================
-// BLOCK 0700: API 호출 함수 (원본 B007 + Exponential Backoff)
+// BLOCK 0700: API 호출 함수 (통합 패키지)
+// ========================================================================
+
+// ========================================================================
+// BLOCK 0710: updateSetSelector
 // ========================================================================
 function updateSetSelector() {
   var setSelector = DOM.setSelector;
@@ -719,6 +723,9 @@ function updateSetSelector() {
   }
 }
 
+// ========================================================================
+// BLOCK 0720: detectTotalQuestions (타임아웃 + fallback)
+// ========================================================================
 async function detectTotalQuestions() {
     const cached = localStorage.getItem(TOTAL_CACHE_KEY);
     const cachedTime = localStorage.getItem(TOTAL_CACHE_KEY + '_time');
@@ -736,12 +743,17 @@ async function detectTotalQuestions() {
     console.log('🔄 Fetching fresh total...');
     localStorage.removeItem(TOTAL_CACHE_KEY);
     
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    
     try {
         updateSplash(30, 'Checking total questions...');
         const url = ORIGINAL_API_URL + '?total=true&_=' + Date.now();
         console.log('📡 Requesting total (direct):', url);
         
-        const response = await fetch(url);
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        
         if (!response.ok) throw new Error('HTTP ' + response.status);
         
         const text = await response.text();
@@ -763,7 +775,14 @@ async function detectTotalQuestions() {
         
         console.warn('⚠️ Could not detect total, using fallback: 1320');
     } catch(e) {
-        console.error('❌ Total API call failed:', e.message);
+        clearTimeout(timeoutId);
+        if (e.name === 'AbortError') {
+            console.warn('⏱️ API timeout, using fallback...');
+            showToast('서버 응답이 없습니다. 기본값을 사용합니다.', 'warn', 3000);
+        } else {
+            console.error('❌ Total API call failed:', e.message);
+            showToast('문제 수를 불러오지 못했습니다. 기본값을 사용합니다.', 'warn', 3000);
+        }
     }
     
     TOTAL_QUESTIONS = 1320;
@@ -774,7 +793,7 @@ async function detectTotalQuestions() {
 }
 
 // ========================================================================
-// BLOCK 0710: load50Questions (수정본 - choices 처리 강화)
+// BLOCK 0730: load50Questions (타임아웃 + 재시도 + choices 강화)
 // ========================================================================
 let currentAbortController = null;
 
@@ -788,11 +807,17 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
     }
     currentAbortController = new AbortController();
     
+    const timeoutId = setTimeout(() => {
+        if (currentAbortController) currentAbortController.abort();
+    }, 15000);
+    
     try {
         var url = ORIGINAL_API_URL + '?start=' + uiStartNumber + '&limit=' + QUESTIONS_PER_SET;
         console.log('📡 Requesting questions (direct):', url);
         
         var response = await fetch(url, { signal: currentAbortController.signal });
+        clearTimeout(timeoutId);
+        
         if (!response.ok) throw new Error('HTTP ' + response.status);
         
         var text = await response.text();
@@ -857,23 +882,16 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                 var questionText = parsed.Q || parsed.question || parsed.q || parsed.문제 || parsed.text || 'Question ' + (uiStartNumber + idx);
                 var passageText = parsed.passage || parsed.P || parsed.p || parsed.지문 || '';
                 
-                // ★★★★★ choices 처리 강화 ★★★★★
-                // 1. 명시적 choices 객체 확인
                 var choices = {};
                 var hasAnyChoice = false;
-                
-                // 2. parsed['1'], parsed['2'], parsed['3'], parsed['4'] 확인
                 for (var ci = 1; ci <= 4; ci++) {
                     var key = String(ci);
                     var val = parsed[key];
-                    // 값이 있으면 choices에 추가
                     if (val !== undefined && val !== null && val !== '') {
                         choices[key] = String(val);
                         hasAnyChoice = true;
                     }
                 }
-                
-                // 3. parsed.options 배열 확인
                 if (!hasAnyChoice && parsed.options && Array.isArray(parsed.options)) {
                     for (var oi = 0; oi < parsed.options.length && oi < 4; oi++) {
                         var opt = parsed.options[oi];
@@ -883,8 +901,6 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                         }
                     }
                 }
-                
-                // 4. parsed.choices 객체 확인
                 if (!hasAnyChoice && parsed.choices && typeof parsed.choices === 'object') {
                     var choiceKeys = Object.keys(parsed.choices);
                     for (var ck = 0; ck < choiceKeys.length; ck++) {
@@ -896,15 +912,11 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                         }
                     }
                 }
-                
-                // 5. 선택지가 없으면 기본값 채우기 (주관식 방지)
                 if (!hasAnyChoice) {
-                    // 객관식 데이터인데 빈 값이면 기본 선택지 추가
                     choices = { '1': 'Option A', '2': 'Option B', '3': 'Option C', '4': 'Option D' };
                     console.warn('⚠️ No choices found for question ' + idx + ', using defaults');
                 }
                 
-                // ★★★★★ 정답 처리 ★★★★★
                 var finalAnswer = '1';
                 if (parsed.A !== undefined && parsed.A !== null && parsed.A !== "") {
                     finalAnswer = String(parsed.A).trim();
@@ -915,8 +927,6 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                 } else if (parsed.a !== undefined && parsed.a !== null && parsed.a !== "") {
                     finalAnswer = String(parsed.a).trim();
                 }
-                
-                // 정답이 choices에 없으면 첫 번째 선택지로 설정
                 if (!choices[finalAnswer] && hasAnyChoice) {
                     var firstKey = Object.keys(choices)[0] || '1';
                     finalAnswer = firstKey;
@@ -953,250 +963,6 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
         
         console.log('✅ Successfully parsed ' + processed.length + ' questions');
         console.log('📝 First question preview:', processed[0]);
-        return processed;
-        
-    } catch(err) {
-        if (err.name === 'AbortError') {
-            LOG.info('🛑 Request aborted by user');
-            throw err;
-        }
-        if (retryCount < MAX_RETRIES) {
-            const delay = Math.pow(2, retryCount) * 1000;
-            console.warn(`🔄 재시도 ${retryCount + 1}/${MAX_RETRIES} (${delay}ms 대기)...`);
-            showToast(`데이터 로드 재시도 중... (${retryCount + 1}/${MAX_RETRIES})`, 'warn', 2000);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            return load50Questions(uiStartNumber, retryCount + 1);
-        }
-        console.error('❌ Load failed after', MAX_RETRIES, 'retries:', err);
-        showToast('문제 데이터를 불러오지 못했습니다. 다시 시도해주세요.', 'error', 5000);
-        throw err;
-    }
-}
-
-// ========================================================================
-// BLOCK 0720: detectTotalQuestions (fallback 강화)
-// ========================================================================
-async function detectTotalQuestions() {
-    // 1. 캐시 확인
-    const cached = localStorage.getItem(TOTAL_CACHE_KEY);
-    const cachedTime = localStorage.getItem(TOTAL_CACHE_KEY + '_time');
-    const now = Date.now();
-    const CACHE_TTL = 5 * 60 * 1000;
-
-    if (cached && cachedTime && (now - parseInt(cachedTime) < CACHE_TTL)) {
-        const total = parseInt(cached);
-        console.log('✅ Using cached total:', total);
-        TOTAL_QUESTIONS = total;
-        updateSplash(60, 'Preparing data...');
-        return total;
-    }
-
-    console.log('🔄 Fetching fresh total...');
-    localStorage.removeItem(TOTAL_CACHE_KEY);
-    
-    // ★★★★★ 타임아웃 추가 (10초) ★★★★★
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-    
-    try {
-        updateSplash(30, 'Checking total questions...');
-        const url = ORIGINAL_API_URL + '?total=true&_=' + Date.now();
-        console.log('📡 Requesting total (direct):', url);
-        
-        const response = await fetch(url, { signal: controller.signal });
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        
-        const text = await response.text();
-        if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
-            throw new Error('HTML response - check Apps Script URL');
-        }
-        
-        const data = JSON.parse(text);
-        const total = data.total || 0;
-        
-        if (total > 0) {
-            TOTAL_QUESTIONS = total;
-            localStorage.setItem(TOTAL_CACHE_KEY, String(TOTAL_QUESTIONS));
-            localStorage.setItem(TOTAL_CACHE_KEY + '_time', String(now));
-            console.log('✅ Total questions:', total);
-            updateSplash(60, 'Preparing data...');
-            return total;
-        }
-        
-        console.warn('⚠️ Could not detect total, using fallback: 1320');
-    } catch(e) {
-        clearTimeout(timeoutId);
-        if (e.name === 'AbortError') {
-            console.warn('⏱️ API timeout, using fallback...');
-            showToast('서버 응답이 없습니다. 기본값을 사용합니다.', 'warn', 3000);
-        } else {
-            console.error('❌ Total API call failed:', e.message);
-            showToast('문제 수를 불러오지 못했습니다. 기본값을 사용합니다.', 'warn', 3000);
-        }
-    }
-    
-    // ★★★★★ fallback: 항상 진행 ★★★★★
-    TOTAL_QUESTIONS = 1320;
-    localStorage.setItem(TOTAL_CACHE_KEY, String(TOTAL_QUESTIONS));
-    localStorage.setItem(TOTAL_CACHE_KEY + '_time', String(now));
-    updateSplash(60, 'Preparing data...');
-    return TOTAL_QUESTIONS;
-}
-
-// ========================================================================
-// BLOCK 0730: load50Questions (타임아웃 추가)
-// ========================================================================
-let currentAbortController = null;
-
-async function load50Questions(uiStartNumber, retryCount = 0) {
-    const MAX_RETRIES = 3;
-    if (TOTAL_QUESTIONS === 0) await detectTotalQuestions();
-    
-    if (currentAbortController) {
-        currentAbortController.abort();
-        LOG.debug('🛑 Previous request aborted');
-    }
-    currentAbortController = new AbortController();
-    
-    // ★★★★★ 타임아웃 (15초) ★★★★★
-    const timeoutId = setTimeout(() => {
-        if (currentAbortController) currentAbortController.abort();
-    }, 15000);
-    
-    try {
-        var url = ORIGINAL_API_URL + '?start=' + uiStartNumber + '&limit=' + QUESTIONS_PER_SET;
-        console.log('📡 Requesting questions (direct):', url);
-        
-        var response = await fetch(url, { signal: currentAbortController.signal });
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        
-        var text = await response.text();
-        if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
-            throw new Error('HTML response - check Apps Script URL');
-        }
-        
-        var data = JSON.parse(text);
-        // ... (나머지 파싱 로직은 동일)
-        
-        // 아래는 원본 파싱 코드 유지
-        var questionsData = [];
-        if (Array.isArray(data)) {
-            questionsData = data;
-        } else if (data && typeof data === 'object') {
-            if (Array.isArray(data.data)) questionsData = data.data;
-            else if (Array.isArray(data.questions)) questionsData = data.questions;
-            else if (Array.isArray(data.items)) questionsData = data.items;
-            else {
-                var keys = Object.keys(data);
-                if (keys.length > 0) {
-                    questionsData = keys.map(function(key) {
-                        var item = data[key];
-                        if (typeof item === 'object' && item !== null) {
-                            item._key = key;
-                            return item;
-                        }
-                        return { question: String(item), answer: '1', _key: key };
-                    });
-                }
-            }
-        }
-        
-        if (!Array.isArray(questionsData) || questionsData.length === 0) {
-            throw new Error('No question data received');
-        }
-        
-        // ... (나머지 파싱 로직 동일)
-        // (여기서 choices 처리 강화 로직은 이미 적용되어 있다고 가정)
-        
-        // processed 배열 생성
-        var processed = [];
-        for (var idx = 0; idx < questionsData.length; idx++) {
-            try {
-                var item = questionsData[idx];
-                var parsed = item;
-                if (typeof item === 'string') {
-                    try { parsed = JSON.parse(item); } catch(e) { parsed = { question: item, answer: '1' }; }
-                }
-                if (!parsed || typeof parsed !== 'object') {
-                    parsed = { question: String(item), answer: '1' };
-                }
-                
-                var questionText = parsed.Q || parsed.question || parsed.q || parsed.문제 || parsed.text || 'Question ' + (uiStartNumber + idx);
-                var passageText = parsed.passage || parsed.P || parsed.p || parsed.지문 || '';
-                
-                var choices = {};
-                var hasAnyChoice = false;
-                for (var ci = 1; ci <= 4; ci++) {
-                    var key = String(ci);
-                    var val = parsed[key];
-                    if (val !== undefined && val !== null && val !== '') {
-                        choices[key] = String(val);
-                        hasAnyChoice = true;
-                    }
-                }
-                if (!hasAnyChoice && parsed.options && Array.isArray(parsed.options)) {
-                    for (var oi = 0; oi < parsed.options.length && oi < 4; oi++) {
-                        var opt = parsed.options[oi];
-                        if (opt !== undefined && opt !== null && opt !== '') {
-                            choices[String(oi + 1)] = String(opt);
-                            hasAnyChoice = true;
-                        }
-                    }
-                }
-                if (!hasAnyChoice && parsed.choices && typeof parsed.choices === 'object') {
-                    var choiceKeys = Object.keys(parsed.choices);
-                    for (var ck = 0; ck < choiceKeys.length; ck++) {
-                        var key = choiceKeys[ck];
-                        var val = parsed.choices[key];
-                        if (val !== undefined && val !== null && val !== '') {
-                            choices[key] = String(val);
-                            hasAnyChoice = true;
-                        }
-                    }
-                }
-                if (!hasAnyChoice) {
-                    choices = { '1': 'Option A', '2': 'Option B', '3': 'Option C', '4': 'Option D' };
-                }
-                
-                var finalAnswer = '1';
-                if (parsed.A !== undefined && parsed.A !== null && parsed.A !== "") {
-                    finalAnswer = String(parsed.A).trim();
-                } else if (parsed.answer !== undefined && parsed.answer !== null && parsed.answer !== "") {
-                    finalAnswer = String(parsed.answer).trim();
-                } else if (parsed.정답 !== undefined && parsed.정답 !== null && parsed.정답 !== "") {
-                    finalAnswer = String(parsed.정답).trim();
-                } else if (parsed.a !== undefined && parsed.a !== null && parsed.a !== "") {
-                    finalAnswer = String(parsed.a).trim();
-                }
-                if (!choices[finalAnswer] && hasAnyChoice) {
-                    var firstKey = Object.keys(choices)[0] || '1';
-                    finalAnswer = firstKey;
-                }
-                
-                var originalNumber = parsed.N || parsed.originalNumber || parsed.n || (uiStartNumber + idx);
-                
-                processed.push({
-                    N: originalNumber,
-                    question: questionText,
-                    passage: passageText,
-                    choices: choices,
-                    answer: finalAnswer,
-                    explanation: parsed.explanation || parsed.E || parsed.e || parsed.해설 || 'No explanation available.',
-                    graphic: parsed.graphic || parsed.G || parsed.g || parsed.그래픽 || parsed.P_graph || '',
-                    originalNumber: originalNumber,
-                    A: parsed.A || parsed.answer || parsed.정답 || ''
-                });
-            } catch(e) {
-                console.warn('⚠️ Parse error for item', idx, ':', e);
-            }
-        }
-        
-        if (processed.length === 0) throw new Error('No valid question data');
-        console.log('✅ Successfully parsed ' + processed.length + ' questions');
         return processed;
         
     } catch(err) {
@@ -3799,7 +3565,7 @@ function initialize() {
 }
 
 // ========================================================================
-// BLOCK 1600: 내보내기 및 전역 노출 (원본 B015)
+// BLOCK 1600: 내보내기 및 전역 노출
 // ========================================================================
 
 // 1. 전역(window) 노출
