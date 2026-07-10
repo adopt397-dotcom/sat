@@ -1591,7 +1591,7 @@ function renderWithEditingMarks(text, isMath) {
 }
 
 // ========================================================================
-// BLOCK 1200: 그래픽 렌더러 (세분화)
+// BLOCK 1200: 그래픽 렌더러 (SAT 모든 타입 지원)
 // ========================================================================
 
 // ========================================================================
@@ -1713,239 +1713,19 @@ function initCanvas(canvasId, width, height) {
         var ctx = canvas.getContext('2d');
         ctx.scale(dpr, dpr);
         
-        RendererManager.registerCanvas(canvas);
+        if (window.RendererManager) {
+            RendererManager.registerCanvas(canvas);
+        }
         resolve({ canvas: canvas, ctx: ctx, w: w, h: h });
     });
 }
 
 // ========================================================================
-// BLOCK 1220: 그래픽 데이터 파서 (graphic 타입)
+// BLOCK 1220: 도형/기하 렌더러 (graphic, shape)
 // ========================================================================
 
 // ========================================================================
-// BLOCK 1221: graphic 타입 - 객체 렌더러
-// ========================================================================
-function renderGraphicObjects(ctx, objects, coord) {
-    var toScreen = coord.toScreen;
-    
-    objects.forEach(function(obj) {
-        switch(obj.type) {
-            case 'segment':
-                renderSegment(ctx, obj, toScreen);
-                break;
-            case 'rightAngle':
-                renderRightAngle(ctx, obj, objects, toScreen);
-                break;
-            case 'text':
-                renderText(ctx, obj, toScreen);
-                break;
-            case 'point':
-                renderPoint(ctx, obj, toScreen);
-                break;
-            case 'circle':
-                renderCircle(ctx, obj, toScreen);
-                break;
-            case 'angle':
-                renderAngle(ctx, obj, toScreen);
-                break;
-        }
-    });
-}
-
-// ========================================================================
-// BLOCK 1222: graphic - 세그먼트 렌더러
-// ========================================================================
-function renderSegment(ctx, obj, toScreen) {
-    var from = toScreen(obj.from.x, obj.from.y);
-    var to = toScreen(obj.to.x, obj.to.y);
-    ctx.beginPath();
-    ctx.moveTo(from.x, from.y);
-    ctx.lineTo(to.x, to.y);
-    ctx.strokeStyle = obj.style?.stroke || '#2c3e50';
-    ctx.lineWidth = obj.style?.strokeWidth || 2;
-    ctx.stroke();
-}
-
-// ========================================================================
-// BLOCK 1223: graphic - 직각 표시 렌더러
-// ========================================================================
-function renderRightAngle(ctx, obj, objects, toScreen) {
-    var v = toScreen(obj.vertex.x, obj.vertex.y);
-    var size = obj.size || 0.8;
-    
-    var neighbors = [];
-    objects.forEach(function(other) {
-        if (other.type === 'segment') {
-            var fromP = other.from;
-            var toP = other.to;
-            if (fromP.x === obj.vertex.x && fromP.y === obj.vertex.y) {
-                neighbors.push(toP);
-            }
-            if (toP.x === obj.vertex.x && toP.y === obj.vertex.y) {
-                neighbors.push(fromP);
-            }
-        }
-    });
-    
-    if (neighbors.length >= 2) {
-        var n1 = toScreen(neighbors[0].x, neighbors[0].y);
-        var n2 = toScreen(neighbors[1].x, neighbors[1].y);
-        var dx1 = n1.x - v.x, dy1 = n1.y - v.y;
-        var dx2 = n2.x - v.x, dy2 = n2.y - v.y;
-        var len1 = Math.sqrt(dx1*dx1 + dy1*dy1);
-        var len2 = Math.sqrt(dx2*dx2 + dy2*dy2);
-        
-        if (len1 > 0 && len2 > 0) {
-            var ratio = size / len1;
-            var p1x = v.x + dx1 * ratio;
-            var p1y = v.y + dy1 * ratio;
-            ratio = size / len2;
-            var p2x = v.x + dx2 * ratio;
-            var p2y = v.y + dy2 * ratio;
-            var p3x = p1x + p2x - v.x;
-            var p3y = p1y + p2y - v.y;
-            
-            ctx.beginPath();
-            ctx.moveTo(p1x, p1y);
-            ctx.lineTo(p3x, p3y);
-            ctx.lineTo(p2x, p2y);
-            ctx.strokeStyle = '#2c3e50';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-        }
-    }
-}
-
-// ========================================================================
-// BLOCK 1224: graphic - 텍스트 렌더러
-// ========================================================================
-function renderText(ctx, obj, toScreen) {
-    var pos = toScreen(obj.x, obj.y);
-    ctx.fillStyle = obj.color || '#2c3e50';
-    ctx.font = (obj.fontSize || 16) + 'px sans-serif';
-    ctx.textAlign = obj.align || 'center';
-    ctx.textBaseline = obj.baseline || 'middle';
-    
-    if (obj.rotation) {
-        ctx.save();
-        ctx.translate(pos.x, pos.y);
-        ctx.rotate(obj.rotation * Math.PI / 180);
-        ctx.fillText(obj.text, 0, 0);
-        ctx.restore();
-    } else {
-        ctx.fillText(obj.text, pos.x, pos.y);
-    }
-}
-
-// ========================================================================
-// BLOCK 1225: graphic - 포인트 렌더러
-// ========================================================================
-function renderPoint(ctx, obj, toScreen) {
-    var pos = toScreen(obj.x, obj.y);
-    ctx.beginPath();
-    ctx.arc(pos.x, pos.y, obj.radius || 5, 0, 2 * Math.PI);
-    ctx.fillStyle = obj.color || '#3498db';
-    ctx.fill();
-    if (obj.stroke) {
-        ctx.strokeStyle = obj.stroke;
-        ctx.lineWidth = obj.strokeWidth || 2;
-        ctx.stroke();
-    }
-}
-
-// ========================================================================
-// BLOCK 1226: graphic - 원 렌더러
-// ========================================================================
-function renderCircle(ctx, obj, toScreen) {
-    var center = toScreen(obj.center.x, obj.center.y);
-    var radiusPx = obj.radius * ((obj._maxX - obj._minX) / (obj._graphW || 600));
-    ctx.beginPath();
-    ctx.arc(center.x, center.y, radiusPx, 0, 2 * Math.PI);
-    ctx.strokeStyle = obj.style?.stroke || '#3498db';
-    ctx.lineWidth = obj.style?.strokeWidth || 2;
-    ctx.stroke();
-    if (obj.style?.fill) {
-        ctx.fillStyle = obj.style.fill;
-        ctx.fill();
-    }
-}
-
-// ========================================================================
-// BLOCK 1227: graphic - 각도 렌더러
-// ========================================================================
-function renderAngle(ctx, obj, toScreen) {
-    var v = toScreen(obj.vertex.x, obj.vertex.y);
-    var sides = obj.sides || [];
-    
-    if (sides.length >= 2) {
-        var p1 = toScreen(sides[0].x, sides[0].y);
-        var p2 = toScreen(sides[1].x, sides[1].y);
-        var angle1 = Math.atan2(p1.y - v.y, p1.x - v.x);
-        var angle2 = Math.atan2(p2.y - v.y, p2.x - v.x);
-        var radius = obj.radius || 30;
-        var startA = Math.min(angle1, angle2);
-        var endA = Math.max(angle1, angle2);
-        
-        if (endA - startA > Math.PI) {
-            var temp = startA;
-            startA = endA;
-            endA = temp + 2 * Math.PI;
-        }
-        
-        ctx.beginPath();
-        ctx.arc(v.x, v.y, radius, startA, endA);
-        ctx.strokeStyle = obj.color || '#e74c3c';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        
-        if (obj.label) {
-            var midA = (startA + endA) / 2;
-            var labelR = radius + 18;
-            var lx = v.x + labelR * Math.cos(midA);
-            var ly = v.y + labelR * Math.sin(midA);
-            ctx.fillStyle = obj.labelColor || '#e74c3c';
-            ctx.font = '14px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(obj.label, lx, ly);
-        }
-    }
-}
-
-// ========================================================================
-// BLOCK 1230: graphic 타입 메인 렌더러
-// ========================================================================
-
-// ========================================================================
-// BLOCK 1231: graphic - 좌표 범위 계산
-// ========================================================================
-function calculateGraphicBounds(objects) {
-    var allPoints = [];
-    objects.forEach(function(obj) {
-        if (obj.from) allPoints.push(obj.from);
-        if (obj.to) allPoints.push(obj.to);
-        if (obj.vertex) allPoints.push(obj.vertex);
-        if (obj.x !== undefined && obj.y !== undefined) allPoints.push({x: obj.x, y: obj.y});
-        if (obj.center) allPoints.push(obj.center);
-    });
-    
-    var minX = 0, maxX = 20, minY = 0, maxY = 20;
-    if (allPoints.length > 0) {
-        var xs = allPoints.map(function(p) { return p.x; });
-        var ys = allPoints.map(function(p) { return p.y; });
-        minX = Math.min.apply(null, xs) - 1;
-        maxX = Math.max.apply(null, xs) + 1;
-        minY = Math.min.apply(null, ys) - 1;
-        maxY = Math.max.apply(null, ys) + 1;
-        if (maxX - minX < 5) { var cx = (minX + maxX) / 2; minX = cx - 3; maxX = cx + 3; }
-        if (maxY - minY < 5) { var cy = (minY + maxY) / 2; minY = cy - 3; maxY = cy + 3; }
-    }
-    
-    return { minX: minX, maxX: maxX, minY: minY, maxY: maxY };
-}
-
-// ========================================================================
-// BLOCK 1232: graphic - 메인 렌더러
+// BLOCK 1221: graphic 타입 렌더러
 // ========================================================================
 function renderGraphicType(parsedData) {
     var canvasId = 'graphic_' + Math.random().toString(36).substr(2, 9);
@@ -1957,17 +1737,105 @@ function renderGraphicType(parsedData) {
         initCanvas(canvasId, 600, 400).then(function(result) {
             if (!result) return;
             var ctx = result.ctx, w = result.w, h = result.h;
+            var objects = parsedData.objects;
             
-            var bounds = calculateGraphicBounds(parsedData.objects);
-            var coord = createCoordinateSystem(ctx, w, h, bounds.minX, bounds.maxX, bounds.minY, bounds.maxY);
+            var allPoints = [];
+            objects.forEach(function(obj) {
+                if (obj.from) allPoints.push(obj.from);
+                if (obj.to) allPoints.push(obj.to);
+                if (obj.vertex) allPoints.push(obj.vertex);
+                if (obj.x !== undefined && obj.y !== undefined) allPoints.push({x: obj.x, y: obj.y});
+                if (obj.center) allPoints.push(obj.center);
+            });
+            
+            var minX = 0, maxX = 20, minY = 0, maxY = 20;
+            if (allPoints.length > 0) {
+                var xs = allPoints.map(function(p) { return p.x; });
+                var ys = allPoints.map(function(p) { return p.y; });
+                minX = Math.min.apply(null, xs) - 1;
+                maxX = Math.max.apply(null, xs) + 1;
+                minY = Math.min.apply(null, ys) - 1;
+                maxY = Math.max.apply(null, ys) + 1;
+                if (maxX - minX < 5) { var cx = (minX + maxX) / 2; minX = cx - 3; maxX = cx + 3; }
+                if (maxY - minY < 5) { var cy = (minY + maxY) / 2; minY = cy - 3; maxY = cy + 3; }
+            }
+            
+            var coord = createCoordinateSystem(ctx, w, h, minX, maxX, minY, maxY);
+            var toScreen = coord.toScreen;
             
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, w, h);
-            
-            if (parsedData.grid !== false) coord.drawGrid();
+            coord.drawGrid();
             coord.drawAxes();
             
-            renderGraphicObjects(ctx, parsedData.objects, coord);
+            objects.forEach(function(obj) {
+                switch(obj.type) {
+                    case 'segment':
+                        var from = toScreen(obj.from.x, obj.from.y);
+                        var to = toScreen(obj.to.x, obj.to.y);
+                        ctx.beginPath();
+                        ctx.moveTo(from.x, from.y);
+                        ctx.lineTo(to.x, to.y);
+                        ctx.strokeStyle = obj.style?.stroke || '#2c3e50';
+                        ctx.lineWidth = obj.style?.strokeWidth || 2;
+                        ctx.stroke();
+                        break;
+                    case 'rightAngle':
+                        var v = toScreen(obj.vertex.x, obj.vertex.y);
+                        var size = obj.size || 0.8;
+                        var neighbors = [];
+                        objects.forEach(function(other) {
+                            if (other.type === 'segment') {
+                                var fromP = other.from;
+                                var toP = other.to;
+                                if (fromP.x === obj.vertex.x && fromP.y === obj.vertex.y) neighbors.push(toP);
+                                if (toP.x === obj.vertex.x && toP.y === obj.vertex.y) neighbors.push(fromP);
+                            }
+                        });
+                        if (neighbors.length >= 2) {
+                            var n1 = toScreen(neighbors[0].x, neighbors[0].y);
+                            var n2 = toScreen(neighbors[1].x, neighbors[1].y);
+                            var dx1 = n1.x - v.x, dy1 = n1.y - v.y;
+                            var dx2 = n2.x - v.x, dy2 = n2.y - v.y;
+                            var len1 = Math.sqrt(dx1*dx1 + dy1*dy1);
+                            var len2 = Math.sqrt(dx2*dx2 + dy2*dy2);
+                            if (len1 > 0 && len2 > 0) {
+                                var ratio = size / len1;
+                                var p1x = v.x + dx1 * ratio;
+                                var p1y = v.y + dy1 * ratio;
+                                ratio = size / len2;
+                                var p2x = v.x + dx2 * ratio;
+                                var p2y = v.y + dy2 * ratio;
+                                var p3x = p1x + p2x - v.x;
+                                var p3y = p1y + p2y - v.y;
+                                ctx.beginPath();
+                                ctx.moveTo(p1x, p1y);
+                                ctx.lineTo(p3x, p3y);
+                                ctx.lineTo(p2x, p2y);
+                                ctx.strokeStyle = '#2c3e50';
+                                ctx.lineWidth = 1.5;
+                                ctx.stroke();
+                            }
+                        }
+                        break;
+                    case 'text':
+                        var pos = toScreen(obj.x, obj.y);
+                        ctx.fillStyle = obj.color || '#2c3e50';
+                        ctx.font = (obj.fontSize || 16) + 'px sans-serif';
+                        ctx.textAlign = obj.align || 'center';
+                        ctx.textBaseline = obj.baseline || 'middle';
+                        if (obj.rotation) {
+                            ctx.save();
+                            ctx.translate(pos.x, pos.y);
+                            ctx.rotate(obj.rotation * Math.PI / 180);
+                            ctx.fillText(obj.text, 0, 0);
+                            ctx.restore();
+                        } else {
+                            ctx.fillText(obj.text, pos.x, pos.y);
+                        }
+                        break;
+                }
+            });
         });
     }, 100);
     
@@ -1975,124 +1843,7 @@ function renderGraphicType(parsedData) {
 }
 
 // ========================================================================
-// BLOCK 1240: shape 타입 렌더러 (문자열 ID 지원)
-// ========================================================================
-
-// ========================================================================
-// BLOCK 1241: shape - 포인트 맵 생성
-// ========================================================================
-function buildPointMap(points) {
-    var map = {};
-    points.forEach(function(p) {
-        var id = p.id;
-        if (id !== undefined && id !== null) {
-            map[String(id)] = p;
-        }
-    });
-    return map;
-}
-
-// ========================================================================
-// BLOCK 1242: shape - 세그먼트 렌더러
-// ========================================================================
-function renderShapeSegments(ctx, segments, pointMap, toScreen) {
-    segments.forEach(function(seg) {
-        var fromPt = pointMap[String(seg.from)];
-        var toPt = pointMap[String(seg.to)];
-        if (!fromPt || !toPt) return;
-        var from = toScreen(fromPt.x, fromPt.y);
-        var to = toScreen(toPt.x, toPt.y);
-        ctx.beginPath();
-        ctx.moveTo(from.x, from.y);
-        ctx.lineTo(to.x, to.y);
-        ctx.strokeStyle = seg.stroke || '#2c3e50';
-        ctx.lineWidth = seg.lineWidth || 2;
-        ctx.stroke();
-    });
-}
-
-// ========================================================================
-// BLOCK 1243: shape - 각도 렌더러 (문자열 ID)
-// ========================================================================
-function renderShapeAngles(ctx, angles, pointMap, toScreen) {
-    angles.forEach(function(a) {
-        var v = pointMap[String(a.vertex)];
-        if (!v) return;
-        var vScreen = toScreen(v.x, v.y);
-        var sides = a.sides || [];
-        
-        if (sides.length >= 2) {
-            var p1 = pointMap[String(sides[0])];
-            var p2 = pointMap[String(sides[1])];
-            if (!p1 || !p2) return;
-            
-            var p1s = toScreen(p1.x, p1.y);
-            var p2s = toScreen(p2.x, p2.y);
-            var angle1 = Math.atan2(p1s.y - vScreen.y, p1s.x - vScreen.x);
-            var angle2 = Math.atan2(p2s.y - vScreen.y, p2s.x - vScreen.x);
-            var radius = a.radius || 30;
-            var startA = Math.min(angle1, angle2);
-            var endA = Math.max(angle1, angle2);
-            
-            if (endA - startA > Math.PI) {
-                var temp = startA;
-                startA = endA;
-                endA = temp + 2 * Math.PI;
-            }
-            
-            ctx.beginPath();
-            ctx.arc(vScreen.x, vScreen.y, radius, startA, endA);
-            ctx.strokeStyle = a.color || '#e74c3c';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            
-            if (a.label) {
-                var midA = (startA + endA) / 2;
-                var labelR = radius + 18;
-                var lx = vScreen.x + labelR * Math.cos(midA);
-                var ly = vScreen.y + labelR * Math.sin(midA);
-                ctx.fillStyle = '#e74c3c';
-                ctx.font = '14px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(a.label, lx, ly);
-            }
-        }
-    });
-}
-
-// ========================================================================
-// BLOCK 1244: shape - 포인트 렌더러
-// ========================================================================
-function renderShapePoints(ctx, points, toScreen) {
-    points.forEach(function(p) {
-        var screen = toScreen(p.x, p.y);
-        ctx.beginPath();
-        ctx.arc(screen.x, screen.y, p.radius || 5, 0, 2 * Math.PI);
-        ctx.fillStyle = p.color || '#3498db';
-        ctx.fill();
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-    });
-}
-
-// ========================================================================
-// BLOCK 1245: shape - 라벨 렌더러
-// ========================================================================
-function renderShapeLabels(ctx, labels, toScreen) {
-    labels.forEach(function(l) {
-        var pos = toScreen(l.x, l.y);
-        ctx.fillStyle = l.color || '#2c3e50';
-        ctx.font = (l.fontSize || 14) + 'px sans-serif';
-        ctx.textAlign = l.align || 'center';
-        ctx.textBaseline = l.baseline || 'middle';
-        ctx.fillText(l.text, pos.x, pos.y);
-    });
-}
-
-// ========================================================================
-// BLOCK 1246: shape - 메인 렌더러
+// BLOCK 1222: shape 타입 렌더러 (문자열 ID 지원)
 // ========================================================================
 function renderShapeType(parsedData) {
     var canvasId = 'shape_' + Math.random().toString(36).substr(2, 9);
@@ -2105,7 +1856,11 @@ function renderShapeType(parsedData) {
             if (!result) return;
             var ctx = result.ctx, w = result.w, h = result.h;
             
-            var pointMap = buildPointMap(parsedData.points);
+            var pointMap = {};
+            parsedData.points.forEach(function(p) {
+                var id = p.id;
+                if (id !== undefined && id !== null) pointMap[String(id)] = p;
+            });
             
             var allPoints = parsedData.points.map(function(p) { return {x: p.x, y: p.y}; });
             var minX = Math.min.apply(null, allPoints.map(function(p) { return p.x; })) - 1;
@@ -2116,14 +1871,90 @@ function renderShapeType(parsedData) {
             if (maxY - minY < 5) { var cy = (minY + maxY) / 2; minY = cy - 3; maxY = cy + 3; }
             
             var coord = createCoordinateSystem(ctx, w, h, minX, maxX, minY, maxY);
+            var toScreen = coord.toScreen;
             
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, w, h);
             
-            if (parsedData.segments) renderShapeSegments(ctx, parsedData.segments, pointMap, coord.toScreen);
-            if (parsedData.angles) renderShapeAngles(ctx, parsedData.angles, pointMap, coord.toScreen);
-            renderShapePoints(ctx, parsedData.points, coord.toScreen);
-            if (parsedData.labels) renderShapeLabels(ctx, parsedData.labels, coord.toScreen);
+            if (parsedData.segments) {
+                parsedData.segments.forEach(function(seg) {
+                    var fromPt = pointMap[String(seg.from)];
+                    var toPt = pointMap[String(seg.to)];
+                    if (!fromPt || !toPt) return;
+                    var from = toScreen(fromPt.x, fromPt.y);
+                    var to = toScreen(toPt.x, toPt.y);
+                    ctx.beginPath();
+                    ctx.moveTo(from.x, from.y);
+                    ctx.lineTo(to.x, to.y);
+                    ctx.strokeStyle = seg.stroke || '#2c3e50';
+                    ctx.lineWidth = seg.lineWidth || 2;
+                    ctx.stroke();
+                });
+            }
+            
+            if (parsedData.angles) {
+                parsedData.angles.forEach(function(a) {
+                    var v = pointMap[String(a.vertex)];
+                    if (!v) return;
+                    var vScreen = toScreen(v.x, v.y);
+                    var sides = a.sides || [];
+                    if (sides.length >= 2) {
+                        var p1 = pointMap[String(sides[0])];
+                        var p2 = pointMap[String(sides[1])];
+                        if (!p1 || !p2) return;
+                        var p1s = toScreen(p1.x, p1.y);
+                        var p2s = toScreen(p2.x, p2.y);
+                        var angle1 = Math.atan2(p1s.y - vScreen.y, p1s.x - vScreen.x);
+                        var angle2 = Math.atan2(p2s.y - vScreen.y, p2s.x - vScreen.x);
+                        var radius = a.radius || 30;
+                        var startA = Math.min(angle1, angle2);
+                        var endA = Math.max(angle1, angle2);
+                        if (endA - startA > Math.PI) {
+                            var temp = startA;
+                            startA = endA;
+                            endA = temp + 2 * Math.PI;
+                        }
+                        ctx.beginPath();
+                        ctx.arc(vScreen.x, vScreen.y, radius, startA, endA);
+                        ctx.strokeStyle = a.color || '#e74c3c';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                        if (a.label) {
+                            var midA = (startA + endA) / 2;
+                            var labelR = radius + 18;
+                            var lx = vScreen.x + labelR * Math.cos(midA);
+                            var ly = vScreen.y + labelR * Math.sin(midA);
+                            ctx.fillStyle = '#e74c3c';
+                            ctx.font = '14px sans-serif';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillText(a.label, lx, ly);
+                        }
+                    }
+                });
+            }
+            
+            parsedData.points.forEach(function(p) {
+                var screen = toScreen(p.x, p.y);
+                ctx.beginPath();
+                ctx.arc(screen.x, screen.y, p.radius || 5, 0, 2 * Math.PI);
+                ctx.fillStyle = p.color || '#3498db';
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+            
+            if (parsedData.labels) {
+                parsedData.labels.forEach(function(l) {
+                    var pos = toScreen(l.x, l.y);
+                    ctx.fillStyle = l.color || '#2c3e50';
+                    ctx.font = (l.fontSize || 14) + 'px sans-serif';
+                    ctx.textAlign = l.align || 'center';
+                    ctx.textBaseline = l.baseline || 'middle';
+                    ctx.fillText(l.text, pos.x, pos.y);
+                });
+            }
         });
     }, 100);
     
@@ -2131,11 +1962,11 @@ function renderShapeType(parsedData) {
 }
 
 // ========================================================================
-// BLOCK 1250: coordinate-plane 타입 렌더러 (함수 그래프)
+// BLOCK 1230: 좌표평면 렌더러 (coordinate-plane)
 // ========================================================================
 
 // ========================================================================
-// BLOCK 1251: coordinate-plane - 함수 평가기
+// BLOCK 1231: 함수 평가기
 // ========================================================================
 function evaluateFunction(expr, x) {
     try {
@@ -2144,7 +1975,6 @@ function evaluateFunction(expr, x) {
             var result = node.evaluate({ x: x });
             return typeof result === 'number' && isFinite(result) ? result : NaN;
         }
-        // Fallback: 간단한 평가 (math.js 없을 때)
         var sanitized = expr.replace(/x/g, '(' + x + ')');
         return Function('"use strict"; return (' + sanitized + ')')();
     } catch(e) {
@@ -2153,7 +1983,7 @@ function evaluateFunction(expr, x) {
 }
 
 // ========================================================================
-// BLOCK 1252: coordinate-plane - 함수 그래프 렌더러
+// BLOCK 1232: 함수 그래프 렌더러
 // ========================================================================
 function renderFunctionGraph(ctx, func, coord, xMin, xMax, yMin, yMax) {
     var equation = func.equation || '';
@@ -2197,7 +2027,7 @@ function renderFunctionGraph(ctx, func, coord, xMin, xMax, yMin, yMax) {
 }
 
 // ========================================================================
-// BLOCK 1253: coordinate-plane - 메인 렌더러
+// BLOCK 1233: coordinate-plane 메인 렌더러
 // ========================================================================
 function renderCoordinatePlane(parsedData) {
     var canvasId = 'coord_' + Math.random().toString(36).substr(2, 9);
@@ -2223,7 +2053,6 @@ function renderCoordinatePlane(parsedData) {
             coord.drawGrid();
             coord.drawAxes();
             
-            // 축 레이블
             ctx.fillStyle = '#555';
             ctx.font = '12px sans-serif';
             ctx.textAlign = 'center';
@@ -2233,10 +2062,43 @@ function renderCoordinatePlane(parsedData) {
             ctx.textBaseline = 'bottom';
             ctx.fillText(parsedData.yAxis?.label || 'y', 12, coord.padding);
             
-            // 함수 그래프
             if (parsedData.functions) {
                 parsedData.functions.forEach(function(func) {
                     renderFunctionGraph(ctx, func, coord, xMin, xMax, yMin, yMax);
+                });
+            }
+            
+            if (parsedData.points) {
+                parsedData.points.forEach(function(pt) {
+                    var screen = coord.toScreen(pt.x, pt.y);
+                    ctx.beginPath();
+                    ctx.arc(screen.x, screen.y, 5, 0, 2 * Math.PI);
+                    ctx.fillStyle = pt.color || '#3498db';
+                    ctx.fill();
+                    if (pt.label) {
+                        ctx.fillStyle = '#333';
+                        ctx.font = '12px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom';
+                        ctx.fillText(pt.label, screen.x, screen.y - 8);
+                    }
+                });
+            }
+            
+            if (parsedData.segments) {
+                parsedData.segments.forEach(function(seg) {
+                    var from = coord.toScreen(seg.from[0], seg.from[1]);
+                    var to = coord.toScreen(seg.to[0], seg.to[1]);
+                    ctx.beginPath();
+                    ctx.moveTo(from.x, from.y);
+                    ctx.lineTo(to.x, to.y);
+                    ctx.strokeStyle = seg.color || '#2c3e50';
+                    ctx.lineWidth = seg.lineWidth || 2;
+                    if (seg.dash) {
+                        ctx.setLineDash(seg.dash);
+                    }
+                    ctx.stroke();
+                    ctx.setLineDash([]);
                 });
             }
         });
@@ -2246,72 +2108,255 @@ function renderCoordinatePlane(parsedData) {
 }
 
 // ========================================================================
-// BLOCK 1260: 메인 renderGraphic 함수 (통합 - 모든 타입 지원)
+// BLOCK 1240: Box-Plot 렌더러 (SAT 통계)
 // ========================================================================
-function renderGraphic(jsonData) {
-    if (!jsonData || jsonData.trim() == "") return "";
+function renderBoxPlotType(parsedData) {
+    var canvasId = 'boxplot_' + Math.random().toString(36).substr(2, 9);
+    var html = '<div style="margin:15px 0;padding:15px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;">' +
+        '<div style="text-align:center;font-weight:bold;color:#2c3e50;margin-bottom:10px;">' + (parsedData.title || 'Box Plot') + '</div>' +
+        '<canvas id="' + canvasId + '" style="width:100%;height:300px;display:block;"></canvas>' +
+        '</div>';
     
-    var data = jsonData.trim();
-    if (data.startsWith("\"") && data.endsWith("\"")) data = data.slice(1, -1);
-    data = data.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+    setTimeout(function() {
+        initCanvas(canvasId, 600, 300).then(function(result) {
+            if (!result) return;
+            var ctx = result.ctx, w = result.w, h = result.h;
+            
+            var min = safeNumber(parsedData.min, 0);
+            var q1 = safeNumber(parsedData.q1, 10);
+            var median = safeNumber(parsedData.median, 20);
+            var q3 = safeNumber(parsedData.q3, 30);
+            var max = safeNumber(parsedData.max, 40);
+            var outliers = safeArray(parsedData.outliers);
+            
+            if (!(q1 < median && median < q3)) {
+                ctx.fillStyle = '#e74c3c';
+                ctx.font = '16px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('⚠️ Box Plot 데이터 오류', w/2, h/2);
+                return;
+            }
+            
+            var padding = { top: 30, bottom: 40, left: 50, right: 30 };
+            var graphW = w - padding.left - padding.right;
+            var graphH = h - padding.top - padding.bottom;
+            
+            var allValues = [min, q1, median, q3, max, ...outliers];
+            var minVal = Math.min(...allValues);
+            var maxVal = Math.max(...allValues);
+            var range = maxVal - minVal || 1;
+            
+            function toY(val) {
+                return padding.top + graphH - ((val - minVal) / range) * graphH;
+            }
+            
+            var cx = w / 2;
+            var boxWidth = graphW * 0.2;
+            var x1 = cx - boxWidth / 2;
+            var x2 = cx + boxWidth / 2;
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, w, h);
+            
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 0.5;
+            for (var i = 0; i <= 4; i++) {
+                var y = padding.top + (i / 4) * graphH;
+                ctx.beginPath();
+                ctx.moveTo(padding.left, y);
+                ctx.lineTo(w - padding.right, y);
+                ctx.stroke();
+                var val = maxVal - (i / 4) * range;
+                ctx.fillStyle = '#666';
+                ctx.font = '11px sans-serif';
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(val.toFixed(1), padding.left - 8, y);
+            }
+            
+            var q1y = toY(q1);
+            var q3y = toY(q3);
+            
+            ctx.fillStyle = 'rgba(52,152,219,0.2)';
+            ctx.strokeStyle = '#2c3e50';
+            ctx.lineWidth = 2;
+            ctx.fillRect(x1, q3y, boxWidth, q1y - q3y);
+            ctx.strokeRect(x1, q3y, boxWidth, q1y - q3y);
+            
+            var medianY = toY(median);
+            ctx.strokeStyle = '#e74c3c';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(x1, medianY);
+            ctx.lineTo(x2, medianY);
+            ctx.stroke();
+            
+            ctx.strokeStyle = '#2c3e50';
+            ctx.lineWidth = 2;
+            var minY = toY(min);
+            ctx.beginPath();
+            ctx.moveTo(cx, minY);
+            ctx.lineTo(cx, q3y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x1, minY);
+            ctx.lineTo(x2, minY);
+            ctx.stroke();
+            
+            var maxY = toY(max);
+            ctx.beginPath();
+            ctx.moveTo(cx, q1y);
+            ctx.lineTo(cx, maxY);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x1, maxY);
+            ctx.lineTo(x2, maxY);
+            ctx.stroke();
+            
+            outliers.forEach(function(val) {
+                var y = toY(val);
+                ctx.beginPath();
+                ctx.arc(cx, y, 6, 0, 2 * Math.PI);
+                ctx.fillStyle = '#e74c3c';
+                ctx.fill();
+                ctx.strokeStyle = '#c0392b';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+            
+            ctx.fillStyle = '#2c3e50';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText('Q1: ' + q1.toFixed(1), x1 - 30, q3y - 10);
+            ctx.fillText('Median: ' + median.toFixed(1), cx, medianY + 8);
+            ctx.fillText('Q3: ' + q3.toFixed(1), x2 + 10, q1y - 10);
+        });
+    }, 100);
     
-    var parsedData = null;
-    try {
-        parsedData = JSON.parse(data);
-    } catch(e) {
-        return '<div style="padding:10px;color:#999;text-align:center;">📊 Invalid JSON</div>';
-    }
-    
-    if (!parsedData || typeof parsedData !== 'object') {
-        return '<div style="padding:10px;color:#999;text-align:center;">📊 No data</div>';
-    }
-    
-    var type = parsedData.type || '';
-    
-    // ★ 타입별 라우팅 (모든 타입 지원)
-    switch(type) {
-        // === 도형/기하 타입 ===
-        case 'graphic':
-            return renderGraphicType(parsedData);
-        case 'shape':
-            return renderShapeType(parsedData);
-        
-        // === 함수/좌표평면 타입 ===
-        case 'coordinate-plane':
-            return renderCoordinatePlane(parsedData);
-        
-        // === 차트 타입 (Chart.js 기반) ===
-        case 'bar':
-        case 'pie':
-        case 'line':
-        case 'scatter':
-        case 'radar':
-        case 'stacked-bar':
-        case 'compare':
-        case 'histogram':
-        case 'dot-plot':
-            return renderChartType(parsedData);
-        
-        // === 테이블 타입 ===
-        case 'table':
-            return renderTableType(parsedData);
-        
-        // === 지원되지 않는 타입 ===
-        default:
-            return '<div style="padding:10px;text-align:center;color:#999;border:1px dashed #ddd;border-radius:8px;margin:15px 0;">' +
-                '<span style="font-size:20px;">📊</span>' +
-                '<p style="margin-top:8px;">Graph type "<strong>' + escapeHtml(type) + '</strong>" is not supported.</p>' +
-                '</div>';
-    }
+    return html;
 }
 
 // ========================================================================
-// BLOCK 1270: renderGraphic 전역 노출
+// BLOCK 1250: 정규분포 곡선 렌더러 (SAT 통계)
 // ========================================================================
-window.renderGraphic = renderGraphic;
+function renderNormalDistributionType(parsedData) {
+    var canvasId = 'normal_' + Math.random().toString(36).substr(2, 9);
+    var html = '<div style="margin:15px 0;padding:15px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;">' +
+        '<div style="text-align:center;font-weight:bold;color:#2c3e50;margin-bottom:10px;">' + (parsedData.title || 'Normal Distribution') + '</div>' +
+        '<canvas id="' + canvasId + '" style="width:100%;height:300px;display:block;"></canvas>' +
+        '</div>';
+    
+    setTimeout(function() {
+        initCanvas(canvasId, 600, 300).then(function(result) {
+            if (!result) return;
+            var ctx = result.ctx, w = result.w, h = result.h;
+            
+            var mean = safeNumber(parsedData.mean, 0);
+            var std = safeNumber(parsedData.std, 1);
+            var xMin = parsedData.xMin !== undefined ? parsedData.xMin : mean - 4 * std;
+            var xMax = parsedData.xMax !== undefined ? parsedData.xMax : mean + 4 * std;
+            
+            if (std <= 0) {
+                ctx.fillStyle = '#e74c3c';
+                ctx.font = '16px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('⚠️ 표준편차는 0보다 커야 합니다', w/2, h/2);
+                return;
+            }
+            
+            function normalPDF(x, m, s) {
+                return (1 / (s * Math.sqrt(2 * Math.PI))) * Math.exp(-Math.pow(x - m, 2) / (2 * s * s));
+            }
+            
+            var range = xMax - xMin;
+            var samples = 200;
+            var points = [];
+            var maxY = 0;
+            for (var i = 0; i <= samples; i++) {
+                var x = xMin + (i / samples) * range;
+                var y = normalPDF(x, mean, std);
+                points.push({ x: x, y: y });
+                if (y > maxY) maxY = y;
+            }
+            
+            var padding = { top: 30, bottom: 40, left: 40, right: 40 };
+            var graphW = w - padding.left - padding.right;
+            var graphH = h - padding.top - padding.bottom;
+            
+            function toScreenX(x) {
+                return padding.left + ((x - xMin) / range) * graphW;
+            }
+            function toScreenY(y) {
+                return padding.top + graphH - (y / maxY) * graphH * 0.95;
+            }
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, w, h);
+            
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(padding.left, padding.top);
+            ctx.lineTo(padding.left, padding.top + graphH);
+            ctx.lineTo(padding.left + graphW, padding.top + graphH);
+            ctx.stroke();
+            
+            ctx.fillStyle = '#555';
+            ctx.font = '11px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            for (var i = -4; i <= 4; i++) {
+                var val = mean + i * std;
+                if (val >= xMin && val <= xMax) {
+                    var sx = toScreenX(val);
+                    ctx.fillText(val.toFixed(1), sx, padding.top + graphH + 6);
+                    ctx.beginPath();
+                    ctx.moveTo(sx, padding.top + graphH);
+                    ctx.lineTo(sx, padding.top + graphH + 4);
+                    ctx.stroke();
+                }
+            }
+            
+            var meanX = toScreenX(mean);
+            ctx.setLineDash([5, 5]);
+            ctx.strokeStyle = '#e74c3c';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(meanX, padding.top);
+            ctx.lineTo(meanX, padding.top + graphH);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = '#e74c3c';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText('μ = ' + mean.toFixed(1), meanX, padding.top - 2);
+            
+            ctx.strokeStyle = '#2c3e50';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            for (var i = 0; i < points.length; i++) {
+                var sx = toScreenX(points[i].x);
+                var sy = toScreenY(points[i].y);
+                if (i === 0) ctx.moveTo(sx, sy);
+                else ctx.lineTo(sx, sy);
+            }
+            ctx.stroke();
+            
+            ctx.fillStyle = '#555';
+            ctx.font = '12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText('x', padding.left + graphW / 2, padding.top + graphH + 25);
+        });
+    }, 100);
+    
+    return html;
+}
 
 // ========================================================================
-// BLOCK 1280: table 타입 렌더러
+// BLOCK 1260: Table 렌더러
 // ========================================================================
 function renderTableType(parsedData) {
     if (!parsedData.headers || !parsedData.rows) {
@@ -2341,7 +2386,7 @@ function renderTableType(parsedData) {
 }
 
 // ========================================================================
-// BLOCK 1290: chart 타입 렌더러 (Chart.js 기반 - bar, pie, line, scatter, dot-plot 등)
+// BLOCK 1270: Chart.js 기반 렌더러 (bar, pie, line, scatter, dot-plot 등)
 // ========================================================================
 function renderChartType(parsedData) {
     var type = parsedData.type || '';
@@ -2350,9 +2395,7 @@ function renderChartType(parsedData) {
         '<canvas id="' + chartId + '" style="width:100%;height:400px;display:block;border-radius:4px;"></canvas>' +
         '</div>';
     
-    // Chart.js 로드 보장
     if (typeof Chart === 'undefined') {
-        // Chart.js가 없으면 로드 시도
         var script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
         script.onload = function() {
@@ -2369,7 +2412,7 @@ function renderChartType(parsedData) {
 }
 
 // ========================================================================
-// BLOCK 1291: Chart.js 기반 렌더링 엔진
+// BLOCK 1271: Chart.js 렌더링 엔진
 // ========================================================================
 function renderChartWithChartJS(parsedData, chartId) {
     var canvas = document.getElementById(chartId);
@@ -2382,16 +2425,20 @@ function renderChartWithChartJS(parsedData, chartId) {
     var ctx = canvas.getContext('2d');
     var type = parsedData.type || '';
     var config = null;
+    var colors = ['#3498db', '#e74c3c', '#27ae60', '#f39c12', '#9b59b6', '#1abc9c'];
     
     // === BAR ===
     if (type === 'bar') {
         var labels = parsedData.labels || [];
         var datasets = [];
-        var colors = ['#3498db', '#e74c3c', '#27ae60', '#f39c12', '#9b59b6', '#1abc9c'];
+        
+        if (parsedData.xAxis && parsedData.xAxis.categories) {
+            labels = parsedData.xAxis.categories;
+        }
         
         if (parsedData.series && Array.isArray(parsedData.series)) {
             datasets = parsedData.series.map(function(s, i) {
-                var color = colors[i % colors.length];
+                var color = s.color || colors[i % colors.length];
                 return {
                     label: s.name || 'Series ' + (i+1),
                     data: s.data || [],
@@ -2453,7 +2500,6 @@ function renderChartWithChartJS(parsedData, chartId) {
     // === LINE ===
     else if (type === 'line' && parsedData.series) {
         var datasets = parsedData.series.map(function(s, i) {
-            var colors = ['#3498db', '#e74c3c', '#27ae60', '#f39c12', '#9b59b6'];
             var color = s.color || colors[i % colors.length];
             var points = s.points || [];
             var data = points.map(function(p) { return { x: p.x, y: p.y }; });
@@ -2520,12 +2566,6 @@ function renderChartWithChartJS(parsedData, chartId) {
                 }
             }
         };
-        
-        // 회귀선 (equation이 있으면)
-        if (parsedData.equation) {
-            // annotation plugin 없이 간단히 선 추가는 생략
-            // 대신 scatter 포인트만 표시
-        }
     }
     
     // === DOT-PLOT ===
@@ -2563,7 +2603,6 @@ function renderChartWithChartJS(parsedData, chartId) {
     
     // === STACKED-BAR ===
     else if (type === 'stacked-bar' && parsedData.labels && parsedData.datasets) {
-        var colors = ['#3498db', '#e74c3c', '#27ae60', '#f39c12', '#9b59b6'];
         var datasets = parsedData.datasets.map(function(ds, i) {
             var color = colors[i % colors.length];
             return {
@@ -2598,7 +2637,6 @@ function renderChartWithChartJS(parsedData, chartId) {
     
     // === RADAR ===
     else if (type === 'radar' && parsedData.labels && parsedData.datasets) {
-        var colors = ['#3498db', '#e74c3c', '#27ae60', '#f39c12', '#9b59b6'];
         var datasets = parsedData.datasets.map(function(ds, i) {
             var color = colors[i % colors.length];
             return {
@@ -2632,7 +2670,6 @@ function renderChartWithChartJS(parsedData, chartId) {
     
     // === COMPARE ===
     else if (type === 'compare' && parsedData.graphs) {
-        var colors = ['#3498db', '#e74c3c', '#27ae60', '#f39c12', '#9b59b6'];
         var datasets = parsedData.graphs.map(function(g, i) {
             var color = colors[i % colors.length];
             var data = (g.points || []).map(function(p) {
@@ -2701,7 +2738,9 @@ function renderChartWithChartJS(parsedData, chartId) {
     if (config) {
         try {
             var chart = new Chart(ctx, config);
-            RendererManager.registerChart(chart);
+            if (window.RendererManager) {
+                RendererManager.registerChart(chart);
+            }
         } catch(e) {
             console.error('Chart rendering error:', e);
             canvas.parentElement.innerHTML = '<div style="padding:20px;text-align:center;color:#e74c3c;">📊 차트 렌더링 오류</div>';
@@ -2709,6 +2748,82 @@ function renderChartWithChartJS(parsedData, chartId) {
     }
 }
 
+// ========================================================================
+// BLOCK 1280: 메인 renderGraphic 함수 (SAT 모든 타입 통합)
+// ========================================================================
+function renderGraphic(jsonData) {
+    if (!jsonData || jsonData.trim() == "") return "";
+    
+    var data = jsonData.trim();
+    if (data.startsWith("\"") && data.endsWith("\"")) data = data.slice(1, -1);
+    data = data.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+    
+    var parsedData = null;
+    try {
+        parsedData = JSON.parse(data);
+    } catch(e) {
+        return '<div style="padding:10px;color:#999;text-align:center;">📊 Invalid JSON</div>';
+    }
+    
+    if (!parsedData || typeof parsedData !== 'object') {
+        return '<div style="padding:10px;color:#999;text-align:center;">📊 No data</div>';
+    }
+    
+    var type = parsedData.type || '';
+    
+    // ★★★ SAT 모든 그래픽 타입 지원 ★★★
+    switch(type) {
+        // === 도형/기하 ===
+        case 'graphic':
+            return renderGraphicType(parsedData);
+        case 'shape':
+            return renderShapeType(parsedData);
+        
+        // === 좌표평면/함수 ===
+        case 'coordinate-plane':
+            return renderCoordinatePlane(parsedData);
+        case 'function':
+            return renderCoordinatePlane(parsedData);
+        
+        // === 통계 그래프 (SAT 단골) ===
+        case 'box-plot':
+        case 'boxplot':
+            return renderBoxPlotType(parsedData);
+        case 'normal-distribution':
+        case 'normal':
+            return renderNormalDistributionType(parsedData);
+        
+        // === 표 ===
+        case 'table':
+        case 'frequency-table':
+            return renderTableType(parsedData);
+        
+        // === Chart.js 기반 차트 ===
+        case 'bar':
+        case 'pie':
+        case 'line':
+        case 'scatter':
+        case 'scatter-only':
+        case 'dot-plot':
+        case 'stacked-bar':
+        case 'radar':
+        case 'compare':
+        case 'histogram':
+            return renderChartType(parsedData);
+        
+        // === 지원되지 않는 타입 ===
+        default:
+            return '<div style="padding:10px;text-align:center;color:#999;border:1px dashed #ddd;border-radius:8px;margin:15px 0;">' +
+                '<span style="font-size:20px;">📊</span>' +
+                '<p style="margin-top:8px;">Graph type "<strong>' + escapeHtml(type) + '</strong>" is not supported.</p>' +
+                '</div>';
+    }
+}
+
+// ========================================================================
+// BLOCK 1290: renderGraphic 전역 노출
+// ========================================================================
+window.renderGraphic = renderGraphic;
 
 // ========================================================================
 // BLOCK 1300: 문제 렌더링 (원본 B011 renderCurrentQuestion + renderSubjectiveQuestion + showExplanation)
