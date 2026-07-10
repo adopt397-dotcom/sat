@@ -1516,6 +1516,48 @@ function autoWrapLatex(text) {
 }
 
 // ========================================================================
+// BLOCK 1120: detectMathQuestion (수학 문제 감지)
+// ========================================================================
+function detectMathQuestion(q) {
+    if (!q) return false;
+    
+    var questionText = q.question || '';
+    var mathIndicators = [
+        /[=≠<>≤≥]/,
+        /[0-9]+[.\s]*[=≠<>≤≥]/,
+        /[a-zA-Z]\^/,
+        /[a-zA-Z]_/,
+        /sqrt|frac|sum|int/,
+        /sin|cos|tan|log|ln/,
+        /[0-9]+\s*[+\-*/]\s*[0-9]+/,
+        /\([^)]+\s*[=≠<>≤≥]\s*[^)]+\)/,
+        /\\[a-zA-Z]+/,
+        /\$.*\$/,
+        /\\\(.*\\\)/
+    ];
+    
+    for (var i = 0; i < mathIndicators.length; i++) {
+        if (mathIndicators[i].test(questionText)) {
+            return true;
+        }
+    }
+    
+    if (q.choices) {
+        var choiceValues = Object.values(q.choices);
+        for (var j = 0; j < choiceValues.length; j++) {
+            var choice = String(choiceValues[j] || '');
+            for (var k = 0; k < mathIndicators.length; k++) {
+                if (mathIndicators[k].test(choice)) {
+                    return true;
+                }
+            }
+        }
+    }
+    
+    return false;
+}
+
+// ========================================================================
 // BLOCK 1200: renderGraphic (원본 B014 완전 복구)
 // ========================================================================
 function renderGraphic(jsonData) {
