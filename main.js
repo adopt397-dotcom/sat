@@ -3149,6 +3149,7 @@ function renderCurrentQuestion() {
     console.warn('⚠️ MathJax not available. LaTeX will not render.');
   }
   
+  // ★★★ handleChoiceClick을 전역 함수로 호출하도록 수정 ★★★
   var choiceEls = DOM.questionContainer.querySelectorAll('.choice:not(.disabled)');
   choiceEls.forEach(function(el) {
     el.removeEventListener('click', handleChoiceClick);
@@ -3176,6 +3177,20 @@ function renderCurrentQuestion() {
     DOM.submitBtn.style.display = 'none';
   }
   DOM.prevBtn.disabled = (currentIndex === 0);
+}
+
+// ========================================================================
+// BLOCK 1335: handleChoiceClick (전역 함수로 분리)
+// ========================================================================
+function handleChoiceClick(e) {
+  var el = e.currentTarget;
+  var choice = parseInt(el.getAttribute('data-choice'));
+  if (isNaN(choice)) return;
+  userAnswers[currentIndex] = choice;
+  if (choice === parseInt(currentQuestions[currentIndex].answer)) correctCount++;
+  saveProgressImmediate();
+  renderCurrentQuestion();
+  showExplanation();
 }
 
 // ========================================================================
