@@ -1,7 +1,7 @@
 // ========================================================================
-// BLOCK 0000: 시스템 메타 정보  
+// BLOCK 0000: 시스템 메타 정보
 // ========================================================================
-// 버전: 6.10.1
+// 버전: 6.10.2
 // 날짜: 2026-07-11
 // 설명: 운영 main.js 기반 + Equation Engine + Geometry 2D Engine + ES Module 통합
 // ========================================================================
@@ -3273,12 +3273,50 @@ function renderChartWithChartJS(parsedData, chartId) {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    title: { display: true, text: parsedData.title || 'Bar Chart', font: { size: 16, weight: 'bold' } },
-                    legend: { position: 'bottom' }
+                    title: {
+                        display: !!parsedData.title,
+                        text: parsedData.title || '',
+                        font: { size: 16, weight: 'bold' }
+                    },
+                    legend: {
+                        display: parsedData.showLegend !== undefined
+                            ? !!parsedData.showLegend
+                            : datasets.length > 1,
+                        position: 'bottom'
+                    }
                 },
                 scales: {
-                    x: { title: { display: true, text: parsedData.xAxis?.label || '' }, grid: { color: '#e0e0e0' } },
-                    y: { beginAtZero: true, title: { display: true, text: parsedData.yAxis?.label || '' }, grid: { color: '#e0e0e0' } }
+                    x: {
+                        title: {
+                            display: !!(parsedData.xAxis && parsedData.xAxis.label),
+                            text: parsedData.xAxis?.label || ''
+                        },
+                        grid: { color: '#e0e0e0' }
+                    },
+                    y: {
+                        beginAtZero: parsedData.yAxis?.min === undefined
+                            ? true
+                            : Number(parsedData.yAxis.min) === 0,
+                        min: parsedData.yAxis?.min !== undefined
+                            ? Number(parsedData.yAxis.min)
+                            : undefined,
+                        max: parsedData.yAxis?.max !== undefined
+                            ? Number(parsedData.yAxis.max)
+                            : undefined,
+                        title: {
+                            display: !!(parsedData.yAxis && parsedData.yAxis.label),
+                            text: parsedData.yAxis?.label || ''
+                        },
+                        ticks: {
+                            stepSize: parsedData.yAxis?.tick !== undefined
+                                ? Number(parsedData.yAxis.tick)
+                                : undefined,
+                            callback: function(value) {
+                                return value + (parsedData.yAxis?.suffix || '');
+                            }
+                        },
+                        grid: { color: '#e0e0e0' }
+                    }
                 }
             }
         };
@@ -3307,43 +3345,172 @@ function renderChartWithChartJS(parsedData, chartId) {
     }
     
     // === LINE ===
-    else if (type === 'line' && parsedData.series) {
-        var datasets = parsedData.series.map(function(s, i) {
+    // Supports both:
+    // 1) category data: xAxis.categories + series[].data
+    // 2) coordinate data: series[].points = [{x,y}, ...]
+    else if (type === 'line' && parsedData.series && Array.isArray(parsedData.series)) {
+        var categoryLabels =
+            (parsedData.xAxis && Array.isArray(parsedData.xAxis.categories))
+                ? parsedData.xAxis.categories
+                : (Array.isArray(parsedData.labels) ? parsedData.labels : []);
+
+        var usesCategoryData = categoryLabels.length > 0 ||
+            parsedData.series.some(function(s) {
+                return Array.isArray(s.data) || Array.isArray(s.values);
+            });
+
+        var lineDatasets = parsedData.series.map(function(s, i) {
             var color = s.color || colors[i % colors.length];
-            var points = s.points || [];
-            var data = points.map(function(p) { return { x: p.x, y: p.y }; });
-            
-            return {
-                label: s.name || 'Series ' + (i+1),
-                data: data,
+            var pointRadius =
+                s.pointRadius !== undefined ? s.pointRadius :
+                (s.pointSize !== undefined ? s.pointSize : 4);
+
+            var dataset = {
+                label: s.name || s.label || 'Series ' + (i + 1),
                 borderColor: color,
                 backgroundColor: color + '20',
-                borderWidth: s.lineWidth || 3,
-                pointRadius: s.pointSize || 5,
-                tension: 0.3,
-                showLine: true,
-                fill: false
+                borderWidth: s.lineWidth || 2,
+                pointRadius: pointRadius,
+                pointHoverRadius: pointRadius + 2,
+                pointBackgroundColor: color,
+                pointBorderColor: color,
+                tension: s.tension !== undefined ? s.tension : 0,
+                showLine: s.showLine !== false,
+                fill: s.fill === true
             };
+
+            if (usesCategoryData) {
+                dataset.data = Array.isArray(s.data)
+                    ? s.data
+                    : (Array.isArray(s.values) ? s.values : []);
+            } else {
+                dataset.data = (s.points || []).map(function(p) {
+                    return { x: Number(p.x), y: Number(p.y) };
+                });
+            }
+
+            return dataset;
         });
-        
-        config = {
-            type: 'scatter',
-            data: { datasets: datasets },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    title: { display: true, text: parsedData.title || 'Line Chart', font: { size: 16, weight: 'bold' } },
-                    legend: { position: 'bottom' }
-                },
-                scales: {
-                    x: { type: 'linear', title: { display: true, text: parsedData.xAxis?.label || 'x' }, grid: { color: '#e0e0e0' } },
-                    y: { title: { display: true, text: parsedData.yAxis?.label || 'y' }, grid: { color: '#e0e0e0' } }
-                }
+
+        var yAxis = parsedData.yAxis || {};
+        var xAxis = parsedData.xAxis || {};
+        var suffix = yAxis.suffix || '';
+
+        var commonPlugins = {
+            title: {
+                display: !!parsedData.title,
+                text: parsedData.title || '',
+                font: { size: 16, weight: 'bold' }
+            },
+            legend: {
+                display: parsedData.showLegend !== undefined
+                    ? !!parsedData.showLegend
+                    : lineDatasets.length > 1,
+                position: 'bottom'
             }
         };
+
+        if (usesCategoryData) {
+            config = {
+                type: 'line',
+                data: {
+                    labels: categoryLabels,
+                    datasets: lineDatasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    plugins: commonPlugins,
+                    scales: {
+                        x: {
+                            type: 'category',
+                            title: {
+                                display: !!xAxis.label,
+                                text: xAxis.label || ''
+                            },
+                            ticks: {
+                                autoSkip: false,
+                                maxRotation: xAxis.rotation !== undefined ? xAxis.rotation : 45,
+                                minRotation: xAxis.rotation !== undefined ? xAxis.rotation : 45
+                            },
+                            grid: {
+                                display: parsedData.grid !== false,
+                                color: '#cfcfcf'
+                            }
+                        },
+                        y: {
+                            beginAtZero: yAxis.min === undefined ? true : Number(yAxis.min) === 0,
+                            min: yAxis.min !== undefined ? Number(yAxis.min) : undefined,
+                            max: yAxis.max !== undefined ? Number(yAxis.max) : undefined,
+                            title: {
+                                display: !!yAxis.label,
+                                text: yAxis.label || ''
+                            },
+                            ticks: {
+                                stepSize: yAxis.tick !== undefined ? Number(yAxis.tick) : undefined,
+                                callback: function(value) {
+                                    return value + suffix;
+                                }
+                            },
+                            grid: {
+                                display: parsedData.grid !== false,
+                                color: '#cfcfcf'
+                            }
+                        }
+                    }
+                }
+            };
+        } else {
+            config = {
+                type: 'scatter',
+                data: { datasets: lineDatasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    plugins: commonPlugins,
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            min: xAxis.min !== undefined ? Number(xAxis.min) : undefined,
+                            max: xAxis.max !== undefined ? Number(xAxis.max) : undefined,
+                            title: {
+                                display: !!xAxis.label,
+                                text: xAxis.label || 'x'
+                            },
+                            ticks: {
+                                stepSize: xAxis.tick !== undefined ? Number(xAxis.tick) : undefined
+                            },
+                            grid: {
+                                display: parsedData.grid !== false,
+                                color: '#cfcfcf'
+                            }
+                        },
+                        y: {
+                            min: yAxis.min !== undefined ? Number(yAxis.min) : undefined,
+                            max: yAxis.max !== undefined ? Number(yAxis.max) : undefined,
+                            title: {
+                                display: !!yAxis.label,
+                                text: yAxis.label || 'y'
+                            },
+                            ticks: {
+                                stepSize: yAxis.tick !== undefined ? Number(yAxis.tick) : undefined,
+                                callback: function(value) {
+                                    return value + suffix;
+                                }
+                            },
+                            grid: {
+                                display: parsedData.grid !== false,
+                                color: '#cfcfcf'
+                            }
+                        }
+                    }
+                }
+            };
+        }
     }
-    
+
     // === SCATTER ===
     else if (type === 'scatter' && parsedData.points) {
         var dataPoints = parsedData.points.map(function(p) {
@@ -4499,7 +4666,8 @@ export {
 // ========================================================================
 // BLOCK 9999: 시스템 시작 로그
 // ========================================================================
-console.log("✅ SAT Digital Quiz System v6.10.1 Loaded!");
+console.log("✅ SAT Digital Quiz System v6.10.2 Loaded!");
+console.log("✅ Chart Engine v6.2: line series.data/categories + axis min/max/tick/suffix 지원");
 console.log("📋 원본 B001~B015 완전 복구 + v4.0.0 최적화 병합");
 console.log("✅ renderGraphic() 800+ 줄 완전 복구");
 console.log("✅ load50Questions() 원본 복구 + Exponential Backoff + AbortController");
