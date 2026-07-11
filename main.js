@@ -2166,6 +2166,7 @@ function renderCoordinatePlane(parsedData) {
 // BLOCK 1234: 통합 방정식 그래프 엔진 v1.0
 // 지원: 일차/이차/절댓값/지수/원/연립/부등식/일반 좌표평면
 // ========================================================================
+
 function normalizeEquationExpression(input) {
     var s = String(input == null ? '' : input).trim();
     s = s.replace(/[−–—]/g, '-').replace(/×/g, '*').replace(/÷/g, '/');
@@ -2360,31 +2361,82 @@ function drawEquationPointsAndSegments(ctx,c,data){
 }
 
 function renderEquationGraph(parsedData) {
-    var data=upgradeLegacyEquationData(parsedData);
-    var canvasId='equation_'+Math.random().toString(36).substr(2,9);
-    var height=safeNumber(data.height,420);
-    var html='<div style="margin:15px 0;padding:15px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;position:relative;">'+
-        (data.title?'<div style="text-align:center;font-weight:700;margin-bottom:8px;">'+escapeHtml(data.title)+'</div>':'')+
-        '<canvas id="'+canvasId+'" style="width:100%;height:'+height+'px;display:block;background:white;border-radius:4px;"></canvas></div>';
-    setTimeout(function(){
-        initCanvas(canvasId,650,height).then(function(result){
-            if(!result)return;
-            var ctx=result.ctx,w=result.w,h=result.h,c=createEquationCoordinateSystem(ctx,w,h,data);
-            ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);
-            drawEquationAxes(ctx,c,data);
-            data.equations.forEach(function(item,index){
-                try{
-                    var compiled=compileEquationItem(item.equation);
-                    var style=Object.assign({color:['#111','#d62728','#1f77b4','#2ca02c'][index%4]},item);
-                    if(compiled.relation.op==='=' ) drawImplicitCurve(ctx,c,compiled,style); else drawInequalityRegion(ctx,c,compiled,style);
-                }catch(err){console.error('Equation compile/render error:',item.equation,err);}
+    var data = upgradeLegacyEquationData(parsedData);
+    var canvasId = 'equation_' + Math.random().toString(36).substr(2, 9);
+    var height = safeNumber(data.height, 420);
+
+    var html = '<div style="margin:15px 0;padding:15px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;position:relative;">' +
+        (data.title
+            ? '<div style="text-align:center;font-weight:700;margin-bottom:8px;">' + escapeHtml(data.title) + '</div>'
+            : '') +
+        '<canvas id="' + canvasId + '" style="width:100%;height:' + height + 'px;display:block;background:white;border-radius:4px;"></canvas></div>';
+
+    setTimeout(function () {
+        initCanvas(canvasId, 650, height).then(async function (result) {
+            if (!result) return;
+
+            var ctx = result.ctx;
+            var w = result.w;
+            var h = result.h;
+            var c = createEquationCoordinateSystem(ctx, w, h, data);
+
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, w, h);
+
+            // 축, 격자, 점, 선분은 Math.js를 기다리지 않고 즉시 표시
+            drawEquationAxes(ctx, c, data);
+            drawEquationPointsAndSegments(ctx, c, data);
+
+            var equations = Array.isArray(data.equations) ? data.equations : [];
+
+            // 점 또는 선분만 있는 그래프는 여기서 즉시 종료
+            if (equations.length === 0) return;
+
+            // 실제 방정식이 있을 때만 Math.js 로드
+            try {
+                if (typeof math === 'undefined') {
+                    await ensureMathJS();
+                }
+            } catch (error) {
+                console.warn('Math.js unavailable; fallback evaluator used', error);
+            }
+
+            // Math.js 로딩 중 다른 문제로 이동했으면 이전 캔버스에 그리지 않음
+            var canvas = document.getElementById(canvasId);
+            if (!canvas || !canvas.isConnected) return;
+
+            equations.forEach(function (item, index) {
+                try {
+                    var equationItem = typeof item === 'string'
+                        ? { equation: item }
+                        : item;
+
+                    if (!equationItem || !equationItem.equation) return;
+
+                    var compiled = compileEquationItem(equationItem.equation);
+                    var style = Object.assign({
+                        color: ['#111', '#d62728', '#1f77b4', '#2ca02c'][index % 4]
+                    }, equationItem);
+
+                    if (compiled.relation.op === '=') {
+                        drawImplicitCurve(ctx, c, compiled, style);
+                    } else {
+                        drawInequalityRegion(ctx, c, compiled, style);
+                    }
+                } catch (err) {
+                    console.error('Equation compile/render error:', item, err);
+                }
             });
-            drawEquationPointsAndSegments(ctx,c,data);
+        }).catch(function (error) {
+            console.error('Equation canvas initialization error:', error);
         });
-    },100);
-    if(typeof math==='undefined') ensureMathJS().catch(function(e){console.warn('Math.js unavailable; fallback evaluator used',e);});
+    }, 0);
+
     return html;
 }
+
+// ========================================================================
+
 
 // ========================================================================
 // BLOCK 1240: Box-Plot 렌더러 (SAT 통계)
