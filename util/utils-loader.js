@@ -121,7 +121,7 @@
             border-color: #f5a623;
         }
         .util-input-small {
-            width: 60px;
+            width: 70px;
             text-align: center;
             display: inline-block;
         }
@@ -294,15 +294,15 @@
     container.id = 'utilsContainer';
     container.innerHTML = `
         <div class="utils-icon-row" id="utilsIconRow">
-            <button class="utils-icon-btn" data-util="clock" title="타이머/스톱워치">⏱️</button>
-            <button class="utils-icon-btn" data-util="calculator" title="계산기">🔢</button>
-            <button class="utils-icon-btn" data-util="memo" title="메모장">📝</button>
-            <button class="utils-icon-btn" data-util="unit" title="단위 변환기">📐</button>
+            <button class="utils-icon-btn" data-util="clock" title="Timer / Stopwatch">⏱️</button>
+            <button class="utils-icon-btn" data-util="calculator" title="Calculator">🔢</button>
+            <button class="utils-icon-btn" data-util="memo" title="Memo">📝</button>
+            <button class="utils-icon-btn" data-util="unit" title="Unit Converter">📐</button>
         </div>
         <div class="utils-panel" id="utilsPanel">
-            <div class="utils-panel-title" id="utilsPanelTitle">📦 유틸리티</div>
+            <div class="utils-panel-title" id="utilsPanelTitle">📦 Utilities</div>
             <div id="utilsPanelContent">
-                <p style="color:rgba(255,255,255,0.4);text-align:center;font-size:0.9rem;">아이콘을 클릭하세요</p>
+                <p style="color:rgba(255,255,255,0.4);text-align:center;font-size:0.9rem;">Click an icon</p>
             </div>
         </div>
     `;
@@ -324,10 +324,10 @@
 
         // -------- UT-0410: 통합 타이머 + 스톱워치 (시계 대체) --------
         clock: {
-            name: '⏱️ 타이머 / 스톱워치',
+            name: '⏱️ Timer / Stopwatch',
             load: function() {
                 // -------- 상태 --------
-                let mode = 'timer'; // 'timer' | 'stopwatch'
+                let mode = 'timer';
                 let timerSeconds = parseInt(localStorage.getItem('util_timer_seconds')) || 134 * 60;
                 let swMs = 0;
                 let running = false;
@@ -339,34 +339,34 @@
                 // -------- UI 생성 --------
                 panelContent.innerHTML = `
                     <div class="util-tabs" id="utilTimeTabs">
-                        <button class="util-tab active" data-mode="timer">⏱️ 타이머</button>
-                        <button class="util-tab" data-mode="stopwatch">⏱️ 스톱워치</button>
+                        <button class="util-tab active" data-mode="timer">⏱️ Timer</button>
+                        <button class="util-tab" data-mode="stopwatch">⏱️ Stopwatch</button>
                     </div>
                     <div id="utilTimeContent">
                         <!-- 타이머 -->
                         <div id="utilTimerMode">
                             <div class="util-display" id="utilTimerDisplay">${formatTime(timerSeconds)}</div>
                             <div class="util-flex" style="justify-content:center;gap:8px;margin-bottom:8px;">
-                                <input class="util-input util-input-small" id="utilTimerMinutes" type="number" min="0" max="99" value="${Math.floor(timerSeconds / 60)}" placeholder="분">
-                                <span style="color:#fff;">분</span>
-                                <input class="util-input util-input-small" id="utilTimerSeconds" type="number" min="0" max="59" value="${timerSeconds % 60}" placeholder="초">
-                                <span style="color:#fff;">초</span>
-                                <button class="util-btn util-btn-secondary" id="utilTimerSet">설정</button>
+                                <input class="util-input util-input-small" id="utilTimerHours" type="number" min="0" max="99" value="${Math.floor(timerSeconds / 3600)}" placeholder="Hr">
+                                <span style="color:#fff;">hr</span>
+                                <input class="util-input util-input-small" id="utilTimerMinutes" type="number" min="0" max="59" value="${Math.floor((timerSeconds % 3600) / 60)}" placeholder="Min">
+                                <span style="color:#fff;">min</span>
+                                <button class="util-btn util-btn-secondary" id="utilTimerSet">Set</button>
                             </div>
                             <div class="util-flex">
-                                <button class="util-btn util-btn-green" id="utilTimerStart">▶ 시작</button>
-                                <button class="util-btn util-btn-red" id="utilTimerStop">⏹ 정지</button>
-                                <button class="util-btn util-btn-secondary" id="utilTimerReset">↺ 리셋</button>
+                                <button class="util-btn util-btn-green" id="utilTimerStart">▶ Start</button>
+                                <button class="util-btn util-btn-red" id="utilTimerStop">⏹ Stop</button>
+                                <button class="util-btn util-btn-secondary" id="utilTimerReset">↺ Reset</button>
                             </div>
                         </div>
                         <!-- 스톱워치 -->
                         <div id="utilStopwatchMode" style="display:none;">
                             <div class="util-display" id="utilSwDisplay">00:00.0</div>
                             <div class="util-flex">
-                                <button class="util-btn util-btn-green" id="utilSwStart">▶ 시작</button>
-                                <button class="util-btn util-btn-red" id="utilSwStop">⏹ 정지</button>
-                                <button class="util-btn util-btn-secondary" id="utilSwLap">📌 랩</button>
-                                <button class="util-btn util-btn-secondary" id="utilSwReset">↺ 리셋</button>
+                                <button class="util-btn util-btn-green" id="utilSwStart">▶ Start</button>
+                                <button class="util-btn util-btn-red" id="utilSwStop">⏹ Stop</button>
+                                <button class="util-btn util-btn-secondary" id="utilSwLap">📌 Lap</button>
+                                <button class="util-btn util-btn-secondary" id="utilSwReset">↺ Reset</button>
                             </div>
                             <div class="util-lap-list" id="utilSwLapList"></div>
                         </div>
@@ -375,8 +375,8 @@
 
                 // -------- DOM 요소 --------
                 const timerDisplay = document.getElementById('utilTimerDisplay');
+                const timerHours = document.getElementById('utilTimerHours');
                 const timerMinutes = document.getElementById('utilTimerMinutes');
-                const timerSecondsInput = document.getElementById('utilTimerSeconds');
                 const timerSetBtn = document.getElementById('utilTimerSet');
                 const timerStartBtn = document.getElementById('utilTimerStart');
                 const timerStopBtn = document.getElementById('utilTimerStop');
@@ -416,10 +416,10 @@
 
                 function updateLapList() {
                     swLapList.innerHTML = laps.map((l, i) =>
-                        `<div><span class="highlight">랩 ${i+1}</span> ${formatSw(l)}</div>`
+                        `<div><span class="highlight">Lap ${i+1}</span> ${formatSw(l)}</div>`
                     ).join('');
                     if (laps.length === 0) {
-                        swLapList.innerHTML = '<div style="color:rgba(255,255,255,0.2);">랩 기록이 없습니다</div>';
+                        swLapList.innerHTML = '<div style="color:rgba(255,255,255,0.2);">No laps recorded</div>';
                     }
                 }
 
@@ -441,7 +441,7 @@
                             clearInterval(interval);
                             interval = null;
                             running = false;
-                            alert('⏰ 시간이 다 되었습니다!');
+                            alert('⏰ Time is up!');
                         }
                     }, 1000);
                 }
@@ -453,7 +453,9 @@
 
                 function timerReset() {
                     timerStop();
-                    timerSeconds = parseInt(timerMinutes.value) * 60 + parseInt(timerSecondsInput.value) || 0;
+                    const hrs = parseInt(timerHours.value) || 0;
+                    const mins = parseInt(timerMinutes.value) || 0;
+                    timerSeconds = hrs * 3600 + mins * 60;
                     if (timerSeconds < 0) timerSeconds = 0;
                     updateTimerDisplay();
                     saveTimerSetting();
@@ -461,9 +463,9 @@
 
                 function timerSet() {
                     timerStop();
+                    const hrs = parseInt(timerHours.value) || 0;
                     const mins = parseInt(timerMinutes.value) || 0;
-                    const secs = parseInt(timerSecondsInput.value) || 0;
-                    timerSeconds = mins * 60 + secs;
+                    timerSeconds = hrs * 3600 + mins * 60;
                     if (timerSeconds < 0) timerSeconds = 0;
                     updateTimerDisplay();
                     saveTimerSetting();
@@ -504,7 +506,6 @@
 
                 // -------- 모드 전환 --------
                 function switchMode(mode) {
-                    // 현재 실행 중인 타이머/스톱워치 정지
                     if (running) {
                         if (mode === 'timer') swStop();
                         else timerStop();
@@ -539,8 +540,8 @@
                 });
 
                 // 엔터키로 설정
+                timerHours.addEventListener('keydown', (e) => { if (e.key === 'Enter') timerSet(); });
                 timerMinutes.addEventListener('keydown', (e) => { if (e.key === 'Enter') timerSet(); });
-                timerSecondsInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') timerSet(); });
 
                 // -------- 초기화 --------
                 updateTimerDisplay();
@@ -557,7 +558,7 @@
 
         // -------- UT-0420: 계산기 --------
         calculator: {
-            name: '🔢 계산기',
+            name: '🔢 Calculator',
             load: function() {
                 let expr = '';
                 panelContent.innerHTML = `
@@ -606,23 +607,23 @@
 
         // -------- UT-0430: 메모장 --------
         memo: {
-            name: '📝 메모장',
+            name: '📝 Memo',
             load: function() {
                 const saved = localStorage.getItem('util_memo') || '';
                 panelContent.innerHTML = `
                     <textarea class="util-textarea" id="utilMemoInput">${saved}</textarea>
                     <div class="util-flex" style="margin-top:8px;">
-                        <button class="util-btn" id="utilMemoSave">💾 저장</button>
-                        <button class="util-btn util-btn-secondary" id="utilMemoClear">🗑️ 지우기</button>
+                        <button class="util-btn" id="utilMemoSave">💾 Save</button>
+                        <button class="util-btn util-btn-secondary" id="utilMemoClear">🗑️ Clear</button>
                     </div>
                 `;
                 document.getElementById('utilMemoSave').addEventListener('click', () => {
                     const val = document.getElementById('utilMemoInput').value;
                     localStorage.setItem('util_memo', val);
-                    alert('✅ 메모가 저장되었습니다.');
+                    alert('✅ Memo saved.');
                 });
                 document.getElementById('utilMemoClear').addEventListener('click', () => {
-                    if (confirm('정말 지우시겠습니까?')) {
+                    if (confirm('Clear memo?')) {
                         document.getElementById('utilMemoInput').value = '';
                         localStorage.removeItem('util_memo');
                     }
@@ -633,7 +634,7 @@
 
         // -------- UT-0440: 단위 변환기 --------
         unit: {
-            name: '📐 단위 변환기',
+            name: '📐 Unit Converter',
             load: function() {
                 const conversions = {
                     length: { m: 1, km: 0.001, cm: 100, mm: 1000, mi: 0.000621371, ft: 3.28084, in: 39.3701 },
@@ -643,16 +644,16 @@
                 panelContent.innerHTML = `
                     <div style="display:flex;flex-direction:column;gap:8px;">
                         <select class="util-select" id="unitType">
-                            <option value="length">📏 길이</option>
-                            <option value="weight">⚖️ 무게</option>
-                            <option value="temperature">🌡️ 온도</option>
+                            <option value="length">📏 Length</option>
+                            <option value="weight">⚖️ Weight</option>
+                            <option value="temperature">🌡️ Temperature</option>
                         </select>
                         <div class="util-flex">
                             <input class="util-input" id="unitInput" type="number" value="1" style="flex:1;">
                             <span style="color:#f5a623;font-weight:600;padding:8px;">=</span>
                             <input class="util-input" id="unitOutput" type="text" readonly style="flex:2;color:#f5a623;background:rgba(0,0,0,0.2);">
                         </div>
-                        <button class="util-btn" id="unitConvertBtn">🔄 변환</button>
+                        <button class="util-btn" id="unitConvertBtn">🔄 Convert</button>
                     </div>
                 `;
                 const convert = () => {
@@ -710,5 +711,5 @@
         });
     });
 
-    console.log('✅ utils-loader.js loaded (시계+계산기 우선 배치)');
+    console.log('✅ utils-loader.js loaded (EN buttons, Hr/Min timer)');
 })();
