@@ -1,5 +1,5 @@
 // ================================================================
-// utils-loader.js: 모든 유틸리티 통합 (시계+계산기 우선 배치)
+// utils-loader.js: 시계 + 계산기 통합 (계산 중 시간 표시)
 // ================================================================
 (function() {
     'use strict';
@@ -218,6 +218,19 @@
             word-break: break-all;
             border: 1px solid rgba(255, 255, 255, 0.05);
         }
+        .util-clock-mini {
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.4);
+            padding: 4px 0 8px 0;
+            letter-spacing: 1px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            margin-bottom: 10px;
+        }
+        .util-clock-mini span {
+            color: #f5a623;
+        }
         .util-tabs {
             display: flex;
             gap: 4px;
@@ -320,36 +333,81 @@
     // ================================================================
     // UT-0400: 유틸리티 정의
     // ================================================================
-    const utils = {
 
-        // -------- UT-0410: 통합 타이머 + 스톱워치 (시계 대체) --------
+    // -------- 공통 시계 상태 (계산기에서도 사용) --------
+    let globalTimerSeconds = parseInt(localStorage.getItem('util_timer_seconds')) || 134 * 60;
+    let globalTimerInterval = null;
+    let globalTimerRunning = false;
+
+    function formatTime(sec) {
+        const h = String(Math.floor(sec / 3600)).padStart(2, '0');
+        const m = String(Math.floor((sec % 3600) / 60)).padStart(2, '0');
+        const s = String(sec % 60).padStart(2, '0');
+        return h + ':' + m + ':' + s;
+    }
+
+    function updateGlobalTimerDisplay() {
+        const display = document.getElementById('utilClockMiniDisplay');
+        if (display) {
+            display.textContent = formatTime(globalTimerSeconds);
+        }
+        localStorage.setItem('util_timer_seconds', String(globalTimerSeconds));
+    }
+
+    function startGlobalTimer() {
+        if (globalTimerInterval) return;
+        globalTimerRunning = true;
+        globalTimerInterval = setInterval(() => {
+            if (globalTimerSeconds > 0) {
+                globalTimerSeconds--;
+                updateGlobalTimerDisplay();
+            } else {
+                clearInterval(globalTimerInterval);
+                globalTimerInterval = null;
+                globalTimerRunning = false;
+                alert('⏰ Time is up!');
+            }
+        }, 1000);
+    }
+
+    function stopGlobalTimer() {
+        globalTimerRunning = false;
+        if (globalTimerInterval) {
+            clearInterval(globalTimerInterval);
+            globalTimerInterval = null;
+        }
+    }
+
+    function resetGlobalTimer() {
+        stopGlobalTimer();
+        globalTimerSeconds = parseInt(localStorage.getItem('util_timer_seconds')) || 134 * 60;
+        updateGlobalTimerDisplay();
+    }
+
+    // -------- UT-0410: 통합 타이머 + 스톱워치 --------
+    const utils = {
         clock: {
             name: '⏱️ Timer / Stopwatch',
             load: function() {
-                // -------- 상태 --------
                 let mode = 'timer';
-                let timerSeconds = parseInt(localStorage.getItem('util_timer_seconds')) || 134 * 60;
                 let swMs = 0;
                 let running = false;
                 let interval = null;
-                let lapCount = 0;
                 let lapStartMs = 0;
                 let laps = [];
 
-                // -------- UI 생성 --------
                 panelContent.innerHTML = `
                     <div class="util-tabs" id="utilTimeTabs">
                         <button class="util-tab active" data-mode="timer">⏱️ Timer</button>
                         <button class="util-tab" data-mode="stopwatch">⏱️ Stopwatch</button>
                     </div>
                     <div id="utilTimeContent">
-                        <!-- 타이머 -->
                         <div id="utilTimerMode">
-                            <div class="util-display" id="utilTimerDisplay">${formatTime(timerSeconds)}</div>
+                            <div class="util-display" id="utilTimerDisplay">${formatTime(globalTimerSeconds)}</div>
                             <div class="util-flex" style="justify-content:center;gap:8px;margin-bottom:8px;">
-                                <input class="util-input util-input-small" id="utilTimerHours" type="number" min="0" max="99" value="${Math.floor(timerSeconds / 3600)}" placeholder="Hr">
+                                <input class="util-input util-input-small" id="utilTimerHours" type="number" min="0" max="99" value="${Math.floor(globalTimerSeconds / 3600)}" placeholder="Hr">
                                 <span style="color:#fff;">hr</span>
-                                <input class="util-input util-input-small" id="utilTimerMinutes" type="number" min="0" max="59" value="${Math.floor((timerSeconds % 3600) / 60)}" placeholder="Min">
+                                <input class="util-input util-input-small" id="utilTimerMinutes" type="number" min="0" max="59" value="${Math.floor((globalTimerSeconds % 3600) / 60)}" placeholder="Min">
                                 <span style="color:#fff;">min</span>
                                 <button class="util-btn util-btn-secondary" id="utilTimerSet">Set</button>
                             </div>
@@ -359,7 +417,6 @@
                                 <button class="util-btn util-btn-secondary" id="utilTimerReset">↺ Reset</button>
                             </div>
                         </div>
-                        <!-- 스톱워치 -->
                         <div id="utilStopwatchMode" style="display:none;">
                             <div class="util-display" id="utilSwDisplay">00:00.0</div>
                             <div class="util-flex">
@@ -373,7 +430,6 @@
                     </div>
                 `;
 
-                // -------- DOM 요소 --------
                 const timerDisplay = document.getElementById('utilTimerDisplay');
                 const timerHours = document.getElementById('utilTimerHours');
                 const timerMinutes = document.getElementById('utilTimerMinutes');
@@ -391,14 +447,6 @@
                 const timerMode = document.getElementById('utilTimerMode');
                 const stopwatchMode = document.getElementById('utilStopwatchMode');
 
-                // -------- 헬퍼 함수 --------
-                function formatTime(sec) {
-                    const h = String(Math.floor(sec / 3600)).padStart(2, '0');
-                    const m = String(Math.floor((sec % 3600) / 60)).padStart(2, '0');
-                    const s = String(sec % 60).padStart(2, '0');
-                    return h + ':' + m + ':' + s;
-                }
-
                 function formatSw(ms) {
                     const m = String(Math.floor(ms / 60000)).padStart(2, '0');
                     const s = String(Math.floor((ms % 60000) / 1000)).padStart(2, '0');
@@ -407,7 +455,8 @@
                 }
 
                 function updateTimerDisplay() {
-                    timerDisplay.textContent = formatTime(timerSeconds);
+                    timerDisplay.textContent = formatTime(globalTimerSeconds);
+                    updateGlobalTimerDisplay();
                 }
 
                 function updateSwDisplay() {
@@ -423,55 +472,36 @@
                     }
                 }
 
-                function saveTimerSetting() {
-                    localStorage.setItem('util_timer_seconds', String(timerSeconds));
+                function timerSet() {
+                    stopGlobalTimer();
+                    const hrs = parseInt(timerHours.value) || 0;
+                    const mins = parseInt(timerMinutes.value) || 0;
+                    globalTimerSeconds = hrs * 3600 + mins * 60;
+                    if (globalTimerSeconds < 0) globalTimerSeconds = 0;
+                    updateTimerDisplay();
+                    localStorage.setItem('util_timer_seconds', String(globalTimerSeconds));
                 }
 
-                // -------- 타이머 로직 --------
                 function timerStart() {
-                    if (running) return;
-                    if (timerSeconds <= 0) return;
-                    running = true;
-                    interval = setInterval(() => {
-                        if (timerSeconds > 0) {
-                            timerSeconds--;
-                            updateTimerDisplay();
-                            saveTimerSetting();
-                        } else {
-                            clearInterval(interval);
-                            interval = null;
-                            running = false;
-                            alert('⏰ Time is up!');
-                        }
-                    }, 1000);
+                    if (globalTimerRunning) return;
+                    if (globalTimerSeconds <= 0) return;
+                    startGlobalTimer();
                 }
 
                 function timerStop() {
-                    running = false;
-                    if (interval) { clearInterval(interval); interval = null; }
+                    stopGlobalTimer();
                 }
 
                 function timerReset() {
-                    timerStop();
+                    stopGlobalTimer();
                     const hrs = parseInt(timerHours.value) || 0;
                     const mins = parseInt(timerMinutes.value) || 0;
-                    timerSeconds = hrs * 3600 + mins * 60;
-                    if (timerSeconds < 0) timerSeconds = 0;
+                    globalTimerSeconds = hrs * 3600 + mins * 60;
+                    if (globalTimerSeconds < 0) globalTimerSeconds = 0;
                     updateTimerDisplay();
-                    saveTimerSetting();
+                    localStorage.setItem('util_timer_seconds', String(globalTimerSeconds));
                 }
 
-                function timerSet() {
-                    timerStop();
-                    const hrs = parseInt(timerHours.value) || 0;
-                    const mins = parseInt(timerMinutes.value) || 0;
-                    timerSeconds = hrs * 3600 + mins * 60;
-                    if (timerSeconds < 0) timerSeconds = 0;
-                    updateTimerDisplay();
-                    saveTimerSetting();
-                }
-
-                // -------- 스톱워치 로직 --------
                 function swStart() {
                     if (running) return;
                     running = true;
@@ -504,7 +534,6 @@
                     updateLapList();
                 }
 
-                // -------- 모드 전환 --------
                 function switchMode(mode) {
                     if (running) {
                         if (mode === 'timer') swStop();
@@ -522,7 +551,6 @@
                     }
                 }
 
-                // -------- 이벤트 바인딩 --------
                 timerStartBtn.addEventListener('click', timerStart);
                 timerStopBtn.addEventListener('click', timerStop);
                 timerResetBtn.addEventListener('click', timerReset);
@@ -539,11 +567,9 @@
                     });
                 });
 
-                // 엔터키로 설정
                 timerHours.addEventListener('keydown', (e) => { if (e.key === 'Enter') timerSet(); });
                 timerMinutes.addEventListener('keydown', (e) => { if (e.key === 'Enter') timerSet(); });
 
-                // -------- 초기화 --------
                 updateTimerDisplay();
                 updateSwDisplay();
                 updateLapList();
@@ -556,12 +582,26 @@
             }
         },
 
-        // -------- UT-0420: 계산기 --------
+        // -------- UT-0420: 계산기 + 미니 시계 (통합) --------
         calculator: {
             name: '🔢 Calculator',
             load: function() {
                 let expr = '';
+
+                // 시계 업데이트 함수 (globalTimer 사용)
+                function updateMiniClock() {
+                    const display = document.getElementById('utilClockMiniDisplay');
+                    if (display) {
+                        display.textContent = formatTime(globalTimerSeconds);
+                    }
+                }
+
                 panelContent.innerHTML = `
+                    <!-- 미니 시계 (항상 표시) -->
+                    <div class="util-clock-mini">
+                        🕐 <span id="utilClockMiniDisplay">${formatTime(globalTimerSeconds)}</span>
+                    </div>
+                    <!-- 계산기 -->
                     <div class="util-result" id="utilCalcDisplay">0</div>
                     <div class="util-grid">
                         ${['sin','cos','tan','log','ln','sqrt'].map(v => `<button data-calc="${v}" class="func">${v}</button>`).join('')}
@@ -571,6 +611,20 @@
                         ${['0','.','π','e','^','%'].map(v => `<button data-calc="${v}" ${['π','e','^','%'].includes(v)?'class="func"':''}>${v}</button>`).join('')}
                     </div>
                 `;
+
+                // 미니 시계 업데이트 (globalTimer 변경 시 반영)
+                const miniClockDisplay = document.getElementById('utilClockMiniDisplay');
+                // 기존 updateGlobalTimerDisplay에 미니 시계 업데이트 추가
+                const origUpdate = updateGlobalTimerDisplay;
+                updateGlobalTimerDisplay = function() {
+                    origUpdate();
+                    if (miniClockDisplay) {
+                        miniClockDisplay.textContent = formatTime(globalTimerSeconds);
+                    }
+                };
+                // 현재 타이머 상태 반영
+                updateGlobalTimerDisplay();
+
                 const display = document.getElementById('utilCalcDisplay');
                 const update = () => { display.textContent = expr || '0'; };
                 const handle = (val) => {
@@ -601,7 +655,19 @@
                     if (k === '%') handle('%');
                 };
                 document.addEventListener('keydown', keyHandler);
-                cleanupFn = () => { document.removeEventListener('keydown', keyHandler); };
+
+                // 시계 업데이트를 위한 인터벌 (1초마다 미니 시계 갱신)
+                const clockInterval = setInterval(() => {
+                    const display = document.getElementById('utilClockMiniDisplay');
+                    if (display) {
+                        display.textContent = formatTime(globalTimerSeconds);
+                    }
+                }, 1000);
+
+                cleanupFn = () => {
+                    document.removeEventListener('keydown', keyHandler);
+                    clearInterval(clockInterval);
+                };
             }
         },
 
@@ -711,5 +777,8 @@
         });
     });
 
-    console.log('✅ utils-loader.js loaded (EN buttons, Hr/Min timer)');
+    // 글로벌 타이머 초기화
+    updateGlobalTimerDisplay();
+
+    console.log('✅ utils-loader.js loaded (Calculator + mini clock integrated)');
 })();
