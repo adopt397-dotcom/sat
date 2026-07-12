@@ -331,10 +331,8 @@
     let cleanupFn = null;
 
     // ================================================================
-    // UT-0400: 유틸리티 정의
+    // UT-0400: 공통 시계 상태 (전역)
     // ================================================================
-
-    // -------- 공통 시계 상태 (계산기에서도 사용) --------
     let globalTimerSeconds = parseInt(localStorage.getItem('util_timer_seconds')) || 134 * 60;
     let globalTimerInterval = null;
     let globalTimerRunning = false;
@@ -347,10 +345,10 @@
     }
 
     function updateGlobalTimerDisplay() {
-        const display = document.getElementById('utilClockMiniDisplay');
-        if (display) {
-            display.textContent = formatTime(globalTimerSeconds);
-        }
+        const displays = document.querySelectorAll('.util-clock-mini-display, .util-timer-main-display');
+        displays.forEach(el => {
+            el.textContent = formatTime(globalTimerSeconds);
+        });
         localStorage.setItem('util_timer_seconds', String(globalTimerSeconds));
     }
 
@@ -384,7 +382,9 @@
         updateGlobalTimerDisplay();
     }
 
-    // -------- UT-0410: 통합 타이머 + 스톱워치 --------
+    // ================================================================
+    // UT-0410: 통합 타이머 + 스톱워치
+    // ================================================================
     const utils = {
         clock: {
             name: '⏱️ Timer / Stopwatch',
@@ -403,7 +403,7 @@
                     </div>
                     <div id="utilTimeContent">
                         <div id="utilTimerMode">
-                            <div class="util-display" id="utilTimerDisplay">${formatTime(globalTimerSeconds)}</div>
+                            <div class="util-display"><span class="util-timer-main-display" id="utilTimerDisplay">${formatTime(globalTimerSeconds)}</span></div>
                             <div class="util-flex" style="justify-content:center;gap:8px;margin-bottom:8px;">
                                 <input class="util-input util-input-small" id="utilTimerHours" type="number" min="0" max="99" value="${Math.floor(globalTimerSeconds / 3600)}" placeholder="Hr">
                                 <span style="color:#fff;">hr</span>
@@ -456,7 +456,6 @@
 
                 function updateTimerDisplay() {
                     timerDisplay.textContent = formatTime(globalTimerSeconds);
-                    updateGlobalTimerDisplay();
                 }
 
                 function updateSwDisplay() {
@@ -479,6 +478,7 @@
                     globalTimerSeconds = hrs * 3600 + mins * 60;
                     if (globalTimerSeconds < 0) globalTimerSeconds = 0;
                     updateTimerDisplay();
+                    updateGlobalTimerDisplay();
                     localStorage.setItem('util_timer_seconds', String(globalTimerSeconds));
                 }
 
@@ -499,6 +499,7 @@
                     globalTimerSeconds = hrs * 3600 + mins * 60;
                     if (globalTimerSeconds < 0) globalTimerSeconds = 0;
                     updateTimerDisplay();
+                    updateGlobalTimerDisplay();
                     localStorage.setItem('util_timer_seconds', String(globalTimerSeconds));
                 }
 
@@ -582,26 +583,16 @@
             }
         },
 
-        // -------- UT-0420: 계산기 + 미니 시계 (통합) --------
+        // -------- UT-0420: 계산기 + 미니 시계 --------
         calculator: {
             name: '🔢 Calculator',
             load: function() {
                 let expr = '';
 
-                // 시계 업데이트 함수 (globalTimer 사용)
-                function updateMiniClock() {
-                    const display = document.getElementById('utilClockMiniDisplay');
-                    if (display) {
-                        display.textContent = formatTime(globalTimerSeconds);
-                    }
-                }
-
                 panelContent.innerHTML = `
-                    <!-- 미니 시계 (항상 표시) -->
                     <div class="util-clock-mini">
-                        🕐 <span id="utilClockMiniDisplay">${formatTime(globalTimerSeconds)}</span>
+                        🕐 <span class="util-clock-mini-display" id="utilClockMiniDisplay">${formatTime(globalTimerSeconds)}</span>
                     </div>
-                    <!-- 계산기 -->
                     <div class="util-result" id="utilCalcDisplay">0</div>
                     <div class="util-grid">
                         ${['sin','cos','tan','log','ln','sqrt'].map(v => `<button data-calc="${v}" class="func">${v}</button>`).join('')}
@@ -612,20 +603,16 @@
                     </div>
                 `;
 
-                // 미니 시계 업데이트 (globalTimer 변경 시 반영)
+                const display = document.getElementById('utilCalcDisplay');
                 const miniClockDisplay = document.getElementById('utilClockMiniDisplay');
-                // 기존 updateGlobalTimerDisplay에 미니 시계 업데이트 추가
-                const origUpdate = updateGlobalTimerDisplay;
-                updateGlobalTimerDisplay = function() {
-                    origUpdate();
+
+                // 미니 시계 업데이트를 위한 전용 인터벌 (1초)
+                const miniClockInterval = setInterval(() => {
                     if (miniClockDisplay) {
                         miniClockDisplay.textContent = formatTime(globalTimerSeconds);
                     }
-                };
-                // 현재 타이머 상태 반영
-                updateGlobalTimerDisplay();
+                }, 1000);
 
-                const display = document.getElementById('utilCalcDisplay');
                 const update = () => { display.textContent = expr || '0'; };
                 const handle = (val) => {
                     if (val === 'clear') { expr = ''; update(); return; }
@@ -656,17 +643,9 @@
                 };
                 document.addEventListener('keydown', keyHandler);
 
-                // 시계 업데이트를 위한 인터벌 (1초마다 미니 시계 갱신)
-                const clockInterval = setInterval(() => {
-                    const display = document.getElementById('utilClockMiniDisplay');
-                    if (display) {
-                        display.textContent = formatTime(globalTimerSeconds);
-                    }
-                }, 1000);
-
                 cleanupFn = () => {
                     document.removeEventListener('keydown', keyHandler);
-                    clearInterval(clockInterval);
+                    clearInterval(miniClockInterval);
                 };
             }
         },
@@ -780,5 +759,5 @@
     // 글로벌 타이머 초기화
     updateGlobalTimerDisplay();
 
-    console.log('✅ utils-loader.js loaded (Calculator + mini clock integrated)');
+    console.log('✅ utils-loader.js loaded (Timer + Calculator sync)');
 })();
