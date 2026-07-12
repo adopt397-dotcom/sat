@@ -1,7 +1,7 @@
 // ========================================================================
 // BLOCK 0000: 시스템 메타 정보
 // ========================================================================
-// 버전: 6.10.2
+// 버전: 6.10.4
 // 날짜: 2026-07-11
 // 설명: 운영 main.js 기반 + Equation Engine + Geometry 2D Engine + ES Module 통합
 // ========================================================================
@@ -1495,11 +1495,52 @@ function initTimer() {
 }
 
 // ========================================================================
+// BLOCK 1105: 혼합 문장 안의 지수식 안전 처리
+// ========================================================================
+function wrapPowerExpressionsSafely(text) {
+    if (!text || typeof text !== 'string') return text || '';
+
+    // 기존 MathJax 구간과 HTML 태그는 그대로 보호한다.
+    var protectedParts = [];
+    var protectedText = text.replace(/\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$[^$]*\$|<[^>]+>/g, function(match) {
+        protectedParts.push(match);
+        return '%%SAFE' + (protectedParts.length - 1) + '%%';
+    });
+
+    // 혼합 문장 안의 간단한 지수는 MathJax에 보내지 않고 HTML <sup>로 표시한다.
+    // 예: 2.2^x → 2.2<sup>x</sup>, x^{2} → x<sup>2</sup>
+    protectedText = protectedText.replace(
+        /((?:\d+(?:\.\d+)?|[A-Za-z]|\([^()\n]+\))\s*)\^\s*(\{[^{}\n]+\}|[A-Za-z0-9]+)(?![A-Za-z0-9}])/g,
+        function(match, base, exponent) {
+            var exp = exponent;
+            if (exp.charAt(0) === '{' && exp.charAt(exp.length - 1) === '}') {
+                exp = exp.slice(1, -1);
+            }
+            return base.trim() + '<sup>' + exp + '</sup>';
+        }
+    );
+
+    protectedText = protectedText
+        .replace(/((?:\d+(?:\.\d+)?|[A-Za-z]|\([^()\n]+\)))²/g, '$1<sup>2</sup>')
+        .replace(/((?:\d+(?:\.\d+)?|[A-Za-z]|\([^()\n]+\)))³/g, '$1<sup>3</sup>');
+
+    return protectedText.replace(/%%SAFE(\d+)%%/g, function(match, idx) {
+        return protectedParts[parseInt(idx, 10)] || match;
+    });
+}
+
+// ========================================================================
 // BLOCK 1110: autoWrapLatex (수정본 - 일반 텍스트 오감지 방지 + 제곱符号 지원)
 // ========================================================================
 function autoWrapLatex(text) {
     if (!text) return text;
-    if (text.includes('\\(') || text.includes('$')) return text;
+    if (text.includes('\\(') || text.includes('$')) return wrapPowerExpressionsSafely(text);
+
+    // 문장 전체를 MathJax로 감싸지 않는다. 혼합 문장에서는 지수식만 처리한다.
+    var wordCount = (String(text).match(/[A-Za-z가-힣]+/g) || []).length;
+    if (wordCount > 6 || /[.!?]|[가-힣]/.test(text)) {
+        return wrapPowerExpressionsSafely(text);
+    }
     
     // 1. 일반 텍스트 패턴 (먼저 체크 - 통과시키기)
     const textPatterns = [
@@ -3911,7 +3952,7 @@ function renderSubjectiveQuestion(q, answered, headerText, passageHtml) {
     '<div class="q-num">' + headerText + '</div>' +
     passageHtml +
     renderGraphic(q.graphic) +
-    '<div class="question-text math-content">' + escapeHtml(q.question) + '</div>';
+    '<div class="question-text math-content">' + wrapPowerExpressionsSafely(q.question) + '</div>';
   if (isAnswered) {
     var userAns = String(answered).trim();
     var isCorrect = (userAns === correctAnswerText) || (parseFloat(userAns) === parseFloat(correctAnswerText));
@@ -4077,20 +4118,10 @@ function renderCurrentQuestion() {
       '</div>';
   }
   
-  // ★★★ 수정: 수식만 LaTeX로 감싸고 질문은 일반 텍스트로 ★★★
+  // ★★★ 혼합 문장 안전 처리: 완전한 지수식만 MathJax로 감싸기 ★★★
   var questionText = q.question || 'No question text';
-  
-  // 수식 패턴 찾기 (숫자, 변수, 연산자, 괄호, 제곱符号)
-  var mathPattern = /([0-9]+[x\^\(\)\+\-\*\/=²³]+[0-9x\^\(\)\+\-\*\/=²³]*|[0-9]²|[a-zA-Z]²|[0-9]+\^\{?[0-9]+\}?|[a-zA-Z]\^\{?[0-9a-zA-Z]+\}?)/g;
-  
-  // 수식 부분만 \(...\)로 감싸기
-  var questionDisplay = questionText.replace(mathPattern, '\\($1\\)');
-  
-  // 만약 수식이 없거나 이미 감싸져 있으면 그대로
-  if (questionDisplay === questionText) {
-    questionDisplay = questionText;
-  }
-  
+  var questionDisplay = wrapPowerExpressionsSafely(questionText);
+
   if (isSubjective) {
     renderSubjectiveQuestion(q, answered, headerText, passageHtml);
     return;
@@ -4619,6 +4650,7 @@ window.isSubjectiveQuestion = isSubjectiveQuestion;
 window.getValidChoiceKeys = getValidChoiceKeys;
 window.randomizeChoicesOnly = randomizeChoicesOnly;
 window.autoWrapLatex = autoWrapLatex;
+window.wrapPowerExpressionsSafely = wrapPowerExpressionsSafely;
 window.detectMathQuestion = detectMathQuestion;
 window.renderWithEditingMarks = renderWithEditingMarks;
 
@@ -4666,7 +4698,7 @@ export {
 // ========================================================================
 // BLOCK 9999: 시스템 시작 로그
 // ========================================================================
-console.log("✅ SAT Digital Quiz System v6.10.2 Loaded!");
+console.log("✅ SAT Digital Quiz System v6.10.3 Loaded!");
 console.log("✅ Chart Engine v6.2: line series.data/categories + axis min/max/tick/suffix 지원");
 console.log("📋 원본 B001~B015 완전 복구 + v4.0.0 최적화 병합");
 console.log("✅ renderGraphic() 800+ 줄 완전 복구");
