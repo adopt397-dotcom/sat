@@ -1,7 +1,7 @@
 // ========================================================================
 // BLOCK 0000: 시스템 메타 정보
 // ========================================================================
-// 버전: 6.10.3
+// 버전: 6.10.4
 // 날짜: 2026-07-11
 // 설명: 운영 main.js 기반 + Equation Engine + Geometry 2D Engine + ES Module 통합
 // ========================================================================
@@ -1500,14 +1500,15 @@ function initTimer() {
 function wrapPowerExpressionsSafely(text) {
     if (!text || typeof text !== 'string') return text || '';
 
-    // 이미 MathJax로 감싼 구간은 그대로 보존
+    // 기존 MathJax 구간과 HTML 태그는 그대로 보호한다.
     var protectedParts = [];
-    var protectedText = text.replace(/\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$[^$]*\$/g, function(match) {
+    var protectedText = text.replace(/\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$[^$]*\$|<[^>]+>/g, function(match) {
         protectedParts.push(match);
-        return '%%MATH' + (protectedParts.length - 1) + '%%';
+        return '%%SAFE' + (protectedParts.length - 1) + '%%';
     });
 
-    // 2.2^x, x^2, (x+1)^3 등의 지수 부분만 완전한 LaTeX로 감싼다.
+    // 혼합 문장 안의 간단한 지수는 MathJax에 보내지 않고 HTML <sup>로 표시한다.
+    // 예: 2.2^x → 2.2<sup>x</sup>, x^{2} → x<sup>2</sup>
     protectedText = protectedText.replace(
         /((?:\d+(?:\.\d+)?|[A-Za-z]|\([^()\n]+\))\s*)\^\s*(\{[^{}\n]+\}|[A-Za-z0-9]+)(?![A-Za-z0-9}])/g,
         function(match, base, exponent) {
@@ -1515,16 +1516,15 @@ function wrapPowerExpressionsSafely(text) {
             if (exp.charAt(0) === '{' && exp.charAt(exp.length - 1) === '}') {
                 exp = exp.slice(1, -1);
             }
-            return '\\(' + base.trim() + '^{' + exp + '}\\)';
+            return base.trim() + '<sup>' + exp + '</sup>';
         }
     );
 
-    // 유니코드 제곱/세제곱도 안전하게 처리
     protectedText = protectedText
-        .replace(/((?:\d+(?:\.\d+)?|[A-Za-z]|\([^()\n]+\)))²/g, '\\($1^{2}\\)')
-        .replace(/((?:\d+(?:\.\d+)?|[A-Za-z]|\([^()\n]+\)))³/g, '\\($1^{3}\\)');
+        .replace(/((?:\d+(?:\.\d+)?|[A-Za-z]|\([^()\n]+\)))²/g, '$1<sup>2</sup>')
+        .replace(/((?:\d+(?:\.\d+)?|[A-Za-z]|\([^()\n]+\)))³/g, '$1<sup>3</sup>');
 
-    return protectedText.replace(/%%MATH(\d+)%%/g, function(match, idx) {
+    return protectedText.replace(/%%SAFE(\d+)%%/g, function(match, idx) {
         return protectedParts[parseInt(idx, 10)] || match;
     });
 }
@@ -3952,7 +3952,7 @@ function renderSubjectiveQuestion(q, answered, headerText, passageHtml) {
     '<div class="q-num">' + headerText + '</div>' +
     passageHtml +
     renderGraphic(q.graphic) +
-    '<div class="question-text math-content">' + escapeHtml(q.question) + '</div>';
+    '<div class="question-text math-content">' + wrapPowerExpressionsSafely(q.question) + '</div>';
   if (isAnswered) {
     var userAns = String(answered).trim();
     var isCorrect = (userAns === correctAnswerText) || (parseFloat(userAns) === parseFloat(correctAnswerText));
