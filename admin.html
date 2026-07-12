@@ -23,7 +23,7 @@
 <!-- BLOCK 03: 스플래시 오버레이 (로딩 화면) -->
 <!-- ============================================================ -->
 <div id="splashOverlay">
-  <div class="icon">📚</div>=
+  <div class="icon">📚</div>
   <div class="title">gongboo<span>.org</span></div>
   <div class="subtitle">QUIZ</div>
   <div class="bar-track"><div class="bar-fill" id="splashBar"></div></div>
@@ -45,6 +45,13 @@
       <span class="sat-badge">Practice</span>
     </div>
     <div class="sat-sub">Reading &amp; Writing · Math</div>
+    <div class="language-switcher" aria-label="Language selector">
+      <label for="languageSelector">Language</label>
+      <select id="languageSelector">
+        <option value="EN">English</option>
+        <option value="KO">한국어</option>
+      </select>
+    </div>
   </div>
 
    <!-- ===== BLOCK 04-2: 설정 영역 (시작/재개) ===== -->
@@ -244,6 +251,26 @@
     position: relative;
     z-index: 1
   }
+  .language-switcher {
+    margin-top: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+    z-index: 2;
+    font-size: .75rem;
+  }
+  .language-switcher label { opacity: .75; }
+  .language-switcher select {
+    padding: 7px 28px 7px 12px;
+    border: 1px solid rgba(255,255,255,.35);
+    border-radius: 18px;
+    background: rgba(255,255,255,.12);
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .language-switcher select option { color: #111; background: #fff; }
 
   /* ===== 설정 영역 ===== */
   .setup-area {
@@ -1095,7 +1122,7 @@
 
 <!-- 2. GitHub main.js 불러오기 + 초기화 -->
 <script type="module">
-import { initialize } from 'https://adopt397-dotcom.github.io/sat/main.js?v=6.10.4';
+import { initialize } from './main.js?v=7.0.0';
 
 document.addEventListener('DOMContentLoaded', () => {
   initialize();
