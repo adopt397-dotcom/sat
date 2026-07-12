@@ -1,7 +1,7 @@
 // ========================================================================
 // BLOCK 0000: 시스템 메타 정보
 // ========================================================================
-// 버전: 7.0.0
+// 버전: 7.0.1
 // 날짜: 2026-07-12
 // 설명: 표준 다국어 스키마 + 언어 전환 + 기존 그래픽/퀴즈 엔진 통합
 // 표준 열: N, SUBJECT, Q_EN, Q_KO, P_EN, P_KO, 1_EN~4_KO, A, E_EN, E_KO, G, D,
@@ -704,6 +704,42 @@ function cleanTextValue(value) {
   return String(value).replace(/\n/g, '<br>').trim();
 }
 
+
+function normalizeSchemaKey(key) {
+  return String(key === null || key === undefined ? '' : key)
+    .replace(/^\uFEFF/, '')
+    .trim()
+    .toUpperCase();
+}
+
+function buildNormalizedRowMap(parsed) {
+  var map = {};
+  if (!parsed || typeof parsed !== 'object') return map;
+  Object.keys(parsed).forEach(function(key) {
+    map[normalizeSchemaKey(key)] = parsed[key];
+  });
+  return map;
+}
+
+function readSchemaValue(parsed, normalizedMap, key) {
+  if (!parsed || typeof parsed !== 'object') return '';
+  if (Object.prototype.hasOwnProperty.call(parsed, key)) return parsed[key];
+  var normalizedKey = normalizeSchemaKey(key);
+  if (normalizedMap && Object.prototype.hasOwnProperty.call(normalizedMap, normalizedKey)) {
+    return normalizedMap[normalizedKey];
+  }
+  return '';
+}
+
+function readLocalizedSchemaValue(parsed, normalizedMap, baseKey, language) {
+  var lang = String(language || 'EN').toUpperCase();
+  var value = readSchemaValue(parsed, normalizedMap, baseKey + '_' + lang);
+  if (value === undefined || value === null || value === '') {
+    value = readSchemaValue(parsed, normalizedMap, baseKey + '_EN');
+  }
+  return cleanTextValue(value);
+}
+
 function getLocalizedRaw(parsed, baseKey, language) {
   var lang = String(language || currentLanguage || 'EN').toUpperCase();
   var localizedKey = baseKey + '_' + lang;
@@ -952,24 +988,25 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                 }
                 
                 // ============================================================
-                // ★★★ 표준 다국어 스키마 매핑 ★★★
+                // ★★★ 표준 다국어 스키마 매핑 (공백/BOM/대소문자 안전) ★★★
                 // ============================================================
+                var normalizedRow = buildNormalizedRowMap(parsed);
+
                 var localized = {
                     question: {
-                        EN: getLocalizedRaw(parsed, 'Q', 'EN'),
-                        KO: getLocalizedRaw(parsed, 'Q', 'KO')
+                        EN: readLocalizedSchemaValue(parsed, normalizedRow, 'Q', 'EN'),
+                        KO: readLocalizedSchemaValue(parsed, normalizedRow, 'Q', 'KO')
                     },
                     passage: {
-                        EN: getLocalizedRaw(parsed, 'P', 'EN'),
-                        KO: getLocalizedRaw(parsed, 'P', 'KO')
+                        EN: readLocalizedSchemaValue(parsed, normalizedRow, 'P', 'EN'),
+                        KO: readLocalizedSchemaValue(parsed, normalizedRow, 'P', 'KO')
                     },
                     explanation: {
-                        EN: getLocalizedRaw(parsed, 'E', 'EN'),
-                        KO: getLocalizedRaw(parsed, 'E', 'KO')
+                        EN: readLocalizedSchemaValue(parsed, normalizedRow, 'E', 'EN'),
+                        KO: readLocalizedSchemaValue(parsed, normalizedRow, 'E', 'KO')
                     }
                 };
 
-                // 구 포맷은 테스트/안전용 폴백만 유지
                 if (!localized.question.EN) localized.question.EN = cleanTextValue(parsed.Q || parsed.question || parsed.q || parsed.문제 || parsed.text || 'Question ' + (uiStartNumber + idx));
                 if (!localized.passage.EN) localized.passage.EN = cleanTextValue(parsed.P || parsed.passage || parsed.p || parsed.지문 || '');
                 if (!localized.explanation.EN) localized.explanation.EN = cleanTextValue(parsed.E || parsed.explanation || parsed.e || parsed.해설 || 'No explanation available.');
@@ -980,12 +1017,22 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
 
                 for (var ci = 1; ci <= 4; ci++) {
                     var key = String(ci);
-                    var enChoice = getLocalizedRaw(parsed, key, 'EN');
-                    var koChoice = getLocalizedRaw(parsed, key, 'KO');
-                    if (!enChoice && parsed[key] !== undefined && parsed[key] !== null) enChoice = cleanTextValue(parsed[key]);
+                    var enChoice = readLocalizedSchemaValue(parsed, normalizedRow, key, 'EN');
+                    var koChoice = readLocalizedSchemaValue(parsed, normalizedRow, key, 'KO');
+
+                    if (!enChoice) {
+                        var legacyChoice = readSchemaValue(parsed, normalizedRow, key);
+                        if (legacyChoice !== undefined && legacyChoice !== null && legacyChoice !== '') {
+                            enChoice = cleanTextValue(legacyChoice);
+                        }
+                    }
+
                     if (enChoice !== '') {
                         choices[key] = enChoice;
-                        choiceTranslations[key] = { EN: enChoice, KO: koChoice || enChoice };
+                        choiceTranslations[key] = {
+                            EN: enChoice,
+                            KO: koChoice || enChoice
+                        };
                         hasAnyChoice = true;
                     }
                 }
@@ -1021,7 +1068,8 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                 }
 
                 var finalAnswer = '1';
-                if (parsed.A !== undefined && parsed.A !== null && parsed.A !== '') finalAnswer = String(parsed.A).trim();
+                var schemaAnswer = readSchemaValue(parsed, normalizedRow, 'A');
+                if (schemaAnswer !== undefined && schemaAnswer !== null && schemaAnswer !== '') finalAnswer = String(schemaAnswer).trim();
                 else if (parsed.answer !== undefined && parsed.answer !== null && parsed.answer !== '') finalAnswer = String(parsed.answer).trim();
                 else if (parsed.정답 !== undefined && parsed.정답 !== null && parsed.정답 !== '') finalAnswer = String(parsed.정답).trim();
 
@@ -1036,9 +1084,12 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                 var originalNumber = parsed.N || parsed.originalNumber || parsed.n || (uiStartNumber + idx);
                 var isLatex = parsed.latex || parsed.math || parsed.isMath || false;
 
+                var graphicValue = readSchemaValue(parsed, normalizedRow, 'G');
+                if (graphicValue === undefined || graphicValue === null) graphicValue = '';
+
                 processed.push({
                     N: originalNumber,
-                    subject: parsed.SUBJECT || CURRENT_SUBJECT,
+                    subject: readSchemaValue(parsed, normalizedRow, 'SUBJECT') || CURRENT_SUBJECT,
                     question: localized.question.EN,
                     passage: localized.passage.EN,
                     choices: choices,
@@ -1046,14 +1097,14 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                     answer: finalAnswer,
                     explanation: localized.explanation.EN,
                     localized: localized,
-                    graphic: parsed.G || parsed.graphic || parsed.g || parsed.그래픽 || '',
+                    graphic: graphicValue || parsed.graphic || parsed.g || parsed.그래픽 || '',
                     originalNumber: originalNumber,
-                    A: parsed.A !== undefined ? parsed.A : finalAnswer,
-                    difficulty: parsed.D || '',
-                    sourceType: parsed.SOURCE_TYPE || '',
-                    variantNo: parsed.VARIANT_NO || 0,
-                    sourceId: parsed.SOURCE_ID || '',
-                    status: parsed.STATUS || '',
+                    A: schemaAnswer !== undefined && schemaAnswer !== null && schemaAnswer !== '' ? schemaAnswer : finalAnswer,
+                    difficulty: readSchemaValue(parsed, normalizedRow, 'D') || '',
+                    sourceType: readSchemaValue(parsed, normalizedRow, 'SOURCE_TYPE') || '',
+                    variantNo: readSchemaValue(parsed, normalizedRow, 'VARIANT_NO') || 0,
+                    sourceId: readSchemaValue(parsed, normalizedRow, 'SOURCE_ID') || '',
+                    status: readSchemaValue(parsed, normalizedRow, 'STATUS') || '',
                     latex: isLatex,
                     raw: parsed
                 });
@@ -1061,6 +1112,7 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                 if (idx === 0) {
                     console.log('📝 First question mapped:', processed[0]);
                     console.log('📝 Choices:', choices);
+                    console.log('🌐 Choice translations:', choiceTranslations);
                     console.log('📝 Answer:', finalAnswer);
                     console.log('📝 hasAnyChoice:', hasAnyChoice);
                 }
@@ -3822,30 +3874,70 @@ function renderChartWithChartJS(parsedData, chartId) {
 // ========================================================================
 // BLOCK 1280: 메인 renderGraphic 함수 (SAT 모든 타입 통합)
 // ========================================================================
-function renderGraphic(jsonData) {
-    // 1️⃣ JSON 문자열이 아니면 변환
-    if (typeof jsonData === 'object' && jsonData !== null) {
-        jsonData = JSON.stringify(jsonData);
-    }
-
-    if (!jsonData || jsonData.trim() == "") return "";
-
-    var data = jsonData.trim();
-    if (data.startsWith("\"") && data.endsWith("\"")) data = data.slice(1, -1);
-    data = data.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
-
-    var parsedData = null;
+function decodeGraphicHtmlEntities(text) {
+    if (typeof text !== 'string' || text.indexOf('&') < 0) return text;
     try {
-        parsedData = JSON.parse(data);
+        var textarea = document.createElement('textarea');
+        textarea.innerHTML = text;
+        return textarea.value;
     } catch (e) {
-        return '<div style="padding:10px;color:#999;text-align:center;">📊 Invalid JSON</div>';
+        return text;
+    }
+}
+
+function parseGraphicPayload(jsonData) {
+    if (jsonData === null || jsonData === undefined) return null;
+
+    if (typeof jsonData === 'object') {
+        return Array.isArray(jsonData) ? null : jsonData;
     }
 
-    if (!parsedData || typeof parsedData !== 'object') {
-        return '<div style="padding:10px;color:#999;text-align:center;">📊 No data</div>';
-    }
+    var data = String(jsonData).trim();
+    if (!data) return null;
 
-    var type = parsedData.type || '';
+    var emptyMarkers = ['null', 'undefined', 'none', 'n/a', 'na', '-', 'no graphic', 'no data'];
+    if (emptyMarkers.indexOf(data.toLowerCase()) >= 0) return null;
+
+    data = decodeGraphicHtmlEntities(data)
+        .replace(/^\uFEFF/, '')
+        .replace(/[“”]/g, '"')
+        .replace(/[‘’]/g, "'")
+        .trim();
+
+    var candidate = data;
+    for (var attempt = 0; attempt < 3; attempt++) {
+        try {
+            var parsed = JSON.parse(candidate);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+            if (typeof parsed === 'string') {
+                candidate = parsed.trim();
+                continue;
+            }
+            return null;
+        } catch (e) {
+            if (attempt === 0) {
+                var cleaned = candidate;
+                if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+                    cleaned = cleaned.slice(1, -1);
+                }
+                cleaned = cleaned.replace(/\\"/g, '"').replace(/\\\\/g, '\\').trim();
+                if (cleaned !== candidate) {
+                    candidate = cleaned;
+                    continue;
+                }
+            }
+            return null;
+        }
+    }
+    return null;
+}
+
+function renderGraphic(jsonData) {
+    var parsedData = parseGraphicPayload(jsonData);
+    if (!parsedData) return "";
+
+    var type = String(parsedData.type || '').trim();
+    if (!type) return "";
 
     // ★★★ scatter-only를 먼저 처리 (Chart.js 직접 렌더링) ★★★
     if (type === 'scatter-only' && parsedData.points && Array.isArray(parsedData.points)) {
@@ -4757,7 +4849,7 @@ export {
 // ========================================================================
 // BLOCK 9999: 시스템 시작 로그
 // ========================================================================
-console.log("✅ SAT Digital Quiz System v7.0.0 Multilingual Loaded!");
+console.log("✅ SAT Digital Quiz System v7.0.1 Multilingual Loaded!");
 console.log("✅ Chart Engine v6.2: line series.data/categories + axis min/max/tick/suffix 지원");
 console.log("📋 원본 B001~B015 완전 복구 + v4.0.0 최적화 병합");
 console.log("✅ renderGraphic() 800+ 줄 완전 복구");
