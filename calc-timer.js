@@ -1,12 +1,19 @@
-// ============================================================
+// ================================================================
 // calc-timer.js: 시계 + 계산기 (아이콘 토글 방식)
-// ============================================================
+// ================================================================
+
+// ================================================================
+// CT-0000: 즉시 실행 함수 (IIFE) 시작
+// ================================================================
 (function() {
     'use strict';
 
-    // ---------- CSS ----------
+    // ================================================================
+    // CT-0100: CSS 동적 삽입
+    // ================================================================
     const style = document.createElement('style');
     style.textContent = `
+        /* CT-0110: 컨테이너 */
         #calcTimerContainer {
             position: fixed;
             top: 20px;
@@ -18,7 +25,8 @@
             align-items: flex-end;
             gap: 8px;
         }
-        /* 아이콘 행 */
+
+        /* CT-0120: 아이콘 행 */
         .icon-row {
             display: flex;
             gap: 10px;
@@ -48,7 +56,7 @@
             color: #f5a623;
         }
 
-        /* 패널 공통 */
+        /* CT-0130: 패널 공통 */
         .panel {
             background: rgba(26, 26, 46, 0.95);
             backdrop-filter: blur(10px);
@@ -65,7 +73,7 @@
             display: block;
         }
 
-        /* 시계 패널 */
+        /* CT-0140: 시계 패널 */
         .clock-display {
             font-size: 2rem;
             font-weight: 700;
@@ -76,7 +84,7 @@
             padding: 4px 0;
         }
 
-        /* 계산기 패널 */
+        /* CT-0150: 계산기 패널 */
         .calc-display {
             background: rgba(0, 0, 0, 0.3);
             border-radius: 8px;
@@ -115,6 +123,8 @@
         .calc-buttons button:active {
             transform: scale(0.95);
         }
+
+        /* CT-0151: 연산자 버튼 */
         .calc-buttons button[data-calc="+"],
         .calc-buttons button[data-calc="-"],
         .calc-buttons button[data-calc="*"],
@@ -122,10 +132,14 @@
         .calc-buttons button[data-calc="="] {
             color: #f5a623;
         }
+
+        /* CT-0152: 초기화/백스페이스 버튼 */
         .calc-buttons button[data-calc="clear"],
         .calc-buttons button[data-calc="backspace"] {
             color: #ff6b6b;
         }
+
+        /* CT-0153: 공학용 버튼 */
         .calc-buttons button[data-calc="sin"],
         .calc-buttons button[data-calc="cos"],
         .calc-buttons button[data-calc="tan"],
@@ -140,6 +154,7 @@
             color: #7ec8e3;
         }
 
+        /* CT-0160: 반응형 */
         @media (max-width: 600px) {
             #calcTimerContainer {
                 top: 10px;
@@ -178,25 +193,28 @@
     `;
     document.head.appendChild(style);
 
-    // ---------- HTML 구조 ----------
+    // ================================================================
+    // CT-0200: HTML 구조 생성
+    // ================================================================
     const container = document.createElement('div');
     container.id = 'calcTimerContainer';
     container.innerHTML = `
-        <!-- 아이콘 행 -->
+        <!-- CT-0210: 아이콘 행 -->
         <div class="icon-row">
             <button class="icon-btn" id="clockIcon" title="시계">🕐</button>
             <button class="icon-btn" id="calcIcon" title="계산기">🔢</button>
         </div>
 
-        <!-- 시계 패널 -->
-        <div class="panel" id="clockPanel">
+        <!-- CT-0220: 시계 패널 (초기 숨김) -->
+        <div class="panel" id="clockPanel" style="display:none;">
             <div class="clock-display" id="calcTimerDisplay">02:14:00</div>
         </div>
 
-        <!-- 계산기 패널 -->
-        <div class="panel" id="calcPanel">
+        <!-- CT-0230: 계산기 패널 (초기 숨김) -->
+        <div class="panel" id="calcPanel" style="display:none;">
             <div class="calc-display" id="calcDisplay">0</div>
             <div class="calc-buttons">
+                <!-- CT-0231: 공학용 버튼 -->
                 <button data-calc="sin">sin</button>
                 <button data-calc="cos">cos</button>
                 <button data-calc="tan">tan</button>
@@ -204,6 +222,7 @@
                 <button data-calc="ln">ln</button>
                 <button data-calc="sqrt">√</button>
 
+                <!-- CT-0232: 숫자 + 연산자 1행 -->
                 <button data-calc="7">7</button>
                 <button data-calc="8">8</button>
                 <button data-calc="9">9</button>
@@ -211,6 +230,7 @@
                 <button data-calc="*">×</button>
                 <button data-calc="backspace">⌫</button>
 
+                <!-- CT-0233: 숫자 + 연산자 2행 -->
                 <button data-calc="4">4</button>
                 <button data-calc="5">5</button>
                 <button data-calc="6">6</button>
@@ -218,6 +238,7 @@
                 <button data-calc="+">+</button>
                 <button data-calc="clear">C</button>
 
+                <!-- CT-0234: 숫자 + 괄호 + = -->
                 <button data-calc="1">1</button>
                 <button data-calc="2">2</button>
                 <button data-calc="3">3</button>
@@ -225,6 +246,7 @@
                 <button data-calc=")">)</button>
                 <button data-calc="=">=</button>
 
+                <!-- CT-0235: 특수 버튼 -->
                 <button data-calc="0">0</button>
                 <button data-calc=".">.</button>
                 <button data-calc="pi">π</button>
@@ -236,7 +258,9 @@
     `;
     document.body.appendChild(container);
 
-    // ---------- DOM 요소 ----------
+    // ================================================================
+    // CT-0300: DOM 요소 참조
+    // ================================================================
     const clockIcon = document.getElementById('clockIcon');
     const calcIcon = document.getElementById('calcIcon');
     const clockPanel = document.getElementById('clockPanel');
@@ -244,7 +268,9 @@
     const timerDisplay = document.getElementById('calcTimerDisplay');
     const calcDisplay = document.getElementById('calcDisplay');
 
-    // ---------- 패널 토글 ----------
+    // ================================================================
+    // CT-0400: 패널 토글
+    // ================================================================
     let clockVisible = false;
     let calcVisible = false;
 
@@ -252,17 +278,17 @@
         clockVisible = !clockVisible;
         clockPanel.classList.toggle('visible', clockVisible);
         clockIcon.classList.toggle('active', clockVisible);
-        // 계산기 패널은 그대로 둠 (함께 닫히지 않음)
     });
 
     calcIcon.addEventListener('click', () => {
         calcVisible = !calcVisible;
         calcPanel.classList.toggle('visible', calcVisible);
         calcIcon.classList.toggle('active', calcVisible);
-        // 시계 패널은 그대로 둠
     });
 
-    // ---------- 시계 (타이머) ----------
+    // ================================================================
+    // CT-0500: 시계 (타이머)
+    // ================================================================
     let timerSeconds = 134 * 60;
     let timerInterval = null;
 
@@ -301,7 +327,9 @@
         updateTimerDisplay();
     }
 
-    // ---------- 계산기 ----------
+    // ================================================================
+    // CT-0600: 계산기 로직
+    // ================================================================
     let calcExpression = '';
 
     function updateCalcDisplay() {
@@ -309,16 +337,21 @@
     }
 
     function handleCalcInput(value) {
+        // CT-0610: 초기화
         if (value === 'clear') {
             calcExpression = '';
             updateCalcDisplay();
             return;
         }
+
+        // CT-0620: 백스페이스
         if (value === 'backspace') {
             calcExpression = calcExpression.slice(0, -1);
             updateCalcDisplay();
             return;
         }
+
+        // CT-0630: 계산 (=)
         if (value === '=') {
             try {
                 let expr = calcExpression
@@ -346,6 +379,7 @@
             return;
         }
 
+        // CT-0640: 공학용 함수 및 상수
         const funcMap = {
             'sin': 'sin(',
             'cos': 'cos(',
@@ -363,11 +397,16 @@
             return;
         }
 
+        // CT-0650: 일반 입력
         calcExpression += value;
         updateCalcDisplay();
     }
 
-    // ---------- 계산기 이벤트 ----------
+    // ================================================================
+    // CT-0700: 이벤트 바인딩
+    // ================================================================
+
+    // CT-0710: 계산기 버튼 클릭
     document.querySelectorAll('[data-calc]').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const value = e.target.getAttribute('data-calc');
@@ -375,6 +414,7 @@
         });
     });
 
+    // CT-0720: 키보드 입력
     document.addEventListener('keydown', (e) => {
         const key = e.key;
         if (key >= '0' && key <= '9') handleCalcInput(key);
@@ -391,10 +431,15 @@
         if (key === '%') handleCalcInput('%');
     });
 
-    // ---------- 초기화 ----------
+    // ================================================================
+    // CT-0800: 초기화 및 전역 노출
+    // ================================================================
+
+    // 시계 시작
     updateTimerDisplay();
     startTimer();
 
+    // 전역 접근
     window.calcTimer = {
         resetTimer,
         startTimer,
@@ -403,4 +448,8 @@
     };
 
     console.log('✅ calc-timer.js loaded (icon toggle)');
+
+// ================================================================
+// CT-9999: 즉시 실행 함수 (IIFE) 종료
+// ================================================================
 })();
