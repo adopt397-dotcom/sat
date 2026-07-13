@@ -1111,6 +1111,21 @@
   background: transparent !important;
 }
 */
+
+  /* v7.1.1 bilingual display */
+  .bilingual-block{display:flex;flex-direction:column;gap:10px}
+  .language-line-en{color:#172033}
+  .language-line-ko{color:#27364d;padding-top:10px;margin-top:2px;border-top:1px dashed #cfd7e3;font-family:'Malgun Gothic','Noto Sans KR',sans-serif}
+  .question-text.bilingual-block{margin-top:18px}
+  .question-text .language-line-en,.question-text .language-line-ko{font-size:17px;line-height:1.75;font-weight:600}
+  .passage-language-card{background:#f8f9fa;padding:16px;border-radius:10px;margin:14px 0;border:1px solid #dee2e6}
+  .passage-language-content .language-line-en,.passage-language-content .language-line-ko{white-space:pre-wrap;font-size:15px;line-height:1.75}
+  .choice-language-content{flex:1;min-width:0}
+  .choice-language-content .language-line-en{font-size:15px;line-height:1.5}
+  .choice-language-content .language-line-ko{font-size:14px;line-height:1.55;color:#56657a}
+  .explanation-language-content{margin-top:14px}
+  .explanation-language-content .language-line-en,.explanation-language-content .language-line-ko{font-size:15px;line-height:1.7}
+
 </style>
 
 <!-- ============================================================ -->
@@ -1120,30 +1135,13 @@
 <!-- 1. MathJax -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-chtml.js"></script>
 
-<!-- 2. GitHub main.js 불러오기 + 초기화 (강제 최신 버전) -->
+<!-- 2. GitHub main.js 불러오기 + 초기화 -->
 <script type="module">
-const APP_VERSION = '7.1.0';
-const moduleUrl = './main.js?v=' + APP_VERSION + '&t=' + Date.now();
-console.log('📦 Loading SAT module:', moduleUrl);
+import { initialize } from './main.js?v=7.1.1';
 
-try {
-  const mod = await import(moduleUrl);
-  window.__SAT_APP_VERSION__ = APP_VERSION;
-  window.__SAT_MODULE_URL__ = moduleUrl;
-  console.log('✅ SAT module loaded:', APP_VERSION);
-
-  const start = () => mod.initialize();
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', start, { once: true });
-  } else {
-    start();
-  }
-} catch (error) {
-  console.error('❌ SAT module load failed:', error);
-  document.body.insertAdjacentHTML('afterbegin',
-    '<div style="padding:16px;background:#fee;color:#b00020;font-weight:700;text-align:center">main.js v7.1.0 load failed: ' +
-    String(error.message || error) + '</div>');
-}
+document.addEventListener('DOMContentLoaded', () => {
+  initialize();
+});
 </script>
 
 
