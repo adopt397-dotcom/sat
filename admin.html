@@ -7,17 +7,6 @@
 
 
 
-<!-- ============================================================ -->
-<!-- BLOCK 02: 타이머 UI -->
-<!-- ============================================================ -->
-<div class="timer-container" id="timerContainer">
-  <div class="timer-display" id="timerDisplay">02:14:00</div>
-  <div class="timer-label">⏱️ Time Remaining</div>
-  <div class="timer-controls">
-    <button class="timer-btn" id="timerPauseBtn">⏸ Pause</button>
-    <button class="timer-btn reset-btn" id="timerResetBtn">↺ Reset</button>
-  </div>
-</div>
 
 <!-- ============================================================ -->
 <!-- BLOCK 03: 스플래시 오버레이 (로딩 화면) -->
@@ -1359,7 +1348,10 @@
 <!-- 1. MathJax -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-chtml.js"></script>
 
-<!-- 2. GitHub main.js 불러오기 + 초기화 -->
+!-- 2. 공용 계산기 + 타이머 -->
+<script src="./util/utils-loader.js?v=1.0"></script>
+
+<!-- 3. GitHub main.js 불러오기 + 초기화 -->
 <script type="module">
 import { initialize } from './main.js?v=8.0C';
 
@@ -1372,56 +1364,53 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <script>
 (function() {
-  const MODE_TEXT = {
-    learn: '🟢 Learn · Answers and explanations are shown automatically.',
-    study: '🔵 Study · Choose a mode before or during the set.',
-    exam: '🔴 Exam · Feedback stays hidden until you submit the set.'
-  };
+  const MODE_TEXT = {<!-- ============================================================ -->
+<!-- BLOCK 07: JavaScript 로드 및 실행 -->
+<!-- ============================================================ -->
 
-  function updateSetTitleFromStart(startNumber) {
-    const title = document.getElementById('currentSetTitle');
-    if (!title) return;
+<!-- 1. MathJax -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-chtml.js"></script>
 
-    const start = Math.max(1, Number(startNumber) || 1);
-    title.textContent = String(Math.ceil(start / 120));
-  }
+<!-- 2. 공용 유틸리티 (계산기 + 타이머) -->
+<script src="./util/utils-loader.js?v=1.0"></script>
 
-  function bindSetTitleUI() {
-    const setSelector = document.getElementById('setSelector');
-    const startInput = document.getElementById('startNumber');
-    const startButton = document.getElementById('startQuizBtn');
+<!-- 3. main.js 로드 -->
+<script type="module">
+import { initialize } from './main.js?v=8.0C';
 
-    if (setSelector) {
-      setSelector.addEventListener('change', function() {
-        const setNumber = Math.max(1, Number(this.value) || 1);
-        updateSetTitleFromStart(((setNumber - 1) * 120) + 1);
-      });
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log('🚀 admin.html loaded');
+    try {
+        await initialize();
+        console.log('✅ initialize() completed');
+    } catch (err) {
+        console.error('❌ initialize() failed:', err);
     }
-
-    if (startInput) {
-      startInput.addEventListener('input', function() {
-        updateSetTitleFromStart(this.value);
-      });
-    }
-
-    if (startButton) {
-      startButton.addEventListener('click', function() {
-        updateSetTitleFromStart(startInput ? startInput.value : 1);
-      });
-    }
-
-    updateSetTitleFromStart(startInput ? startInput.value : 1);
-  }
-
-  function bindModePreviewUI() {
-    // v8.0B1: main.js exclusively controls mode state and behavior.
-  }
-
-  document.addEventListener('DOMContentLoaded', function() {
-    bindSetTitleUI();
-  });
-})();
+});
 </script>
+
+<!-- ============================================================ -->
+<!-- BLOCK 08: UI 설정 -->
+<!-- ============================================================ -->
+<script>
+(function() {
+
+const MODE_TEXT = {
+    learn: {
+        title: '🟢 Learn',
+        desc: 'Read the lesson and learn the concept.'
+    },
+    study: {
+        title: '🔵 Study',
+        desc: 'Practice with immediate feedback.'
+    },
+    exam: {
+        title: '🔴 Exam',
+        desc: 'Solve under real exam conditions.'
+    }
+};
+
+// 이하 기존 코드 계속...
 
 <!-- ============================================================ -->
 <!-- BLOCK 08: SAT Chatbot (Full English, Enter Key, Auto-detect) -->
