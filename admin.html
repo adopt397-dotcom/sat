@@ -60,7 +60,7 @@
         <button type="button" class="mode-btn mode-exam" data-ui-mode="exam">🔴 Exam</button>
       </div>
       <div id="modeDescription" class="mode-description">
-        🔵 Study · Current quiz behavior is unchanged in v8.0A.
+        🔵 Study · Choose a mode before or during the set.
       </div>
     </div>
   </div>
@@ -1139,7 +1139,7 @@
 
 
   /* ============================================================
-     SAT v8.0A — UI ONLY
+     SAT v8.0B — MODES
      Stable quiz behavior remains unchanged.
      ============================================================ */
   .set-separator {
@@ -1246,6 +1246,66 @@
     }
   }
 
+
+  /* SAT v8.0B mode engine */
+  html[data-study-mode="learn"] .quiz-header { border-bottom-color:#27ae60; }
+  html[data-study-mode="study"] .quiz-header { border-bottom-color:#3498db; }
+  html[data-study-mode="exam"] .quiz-header { border-bottom-color:#e74c3c; }
+
+  .choice.selected {
+    border-color:#3498db !important;
+    background:#eaf4fd !important;
+    box-shadow:0 0 0 2px rgba(52,152,219,.12);
+  }
+
+  .learn-panel {
+    margin-top:18px;
+    padding:17px;
+    border-radius:13px;
+    background:#eefaf3;
+    border:1px solid #bfe8cf;
+    text-align:center;
+  }
+
+  .learn-reveal-btn {
+    padding:13px 22px;
+    border:0;
+    border-radius:10px;
+    background:#27ae60;
+    color:#fff;
+    font-size:15px;
+    font-weight:800;
+    cursor:pointer;
+    box-shadow:0 5px 16px rgba(39,174,96,.22);
+  }
+
+  .learn-reveal-btn:hover { background:#219150; }
+
+  .learn-panel-note {
+    margin-top:9px;
+    color:#587063;
+    font-size:13px;
+  }
+
+  .learn-correct-answer {
+    display:inline-block;
+    margin-bottom:12px;
+    padding:9px 16px;
+    border-radius:30px;
+    background:#27ae60;
+    color:#fff;
+    font-weight:800;
+  }
+
+  .learn-completion-message {
+    padding:28px;
+    border-radius:14px;
+    background:#eefaf3;
+    border:1px solid #bfe8cf;
+    line-height:1.8;
+    text-align:center;
+  }
+
 </style>
 
 <!-- ============================================================ -->
@@ -1257,7 +1317,7 @@
 
 <!-- 2. GitHub main.js 불러오기 + 초기화 -->
 <script type="module">
-import { initialize } from './main.js?v=8.0A';
+import { initialize } from './main.js?v=8.0B';
 
 document.addEventListener('DOMContentLoaded', () => {
   initialize();
@@ -1269,9 +1329,9 @@ document.addEventListener('DOMContentLoaded', () => {
 <script>
 (function() {
   const MODE_TEXT = {
-    learn: '🟢 Learn · UI preview only in v8.0A. Quiz behavior remains unchanged.',
-    study: '🔵 Study · Current quiz behavior is unchanged in v8.0A.',
-    exam: '🔴 Exam · UI preview only in v8.0A. Quiz behavior remains unchanged.'
+    learn: '🟢 Learn · Reveal the answer and explanation without answering.',
+    study: '🔵 Study · Choose a mode before or during the set.',
+    exam: '🔴 Exam · Feedback stays hidden until you submit the set.'
   };
 
   function updateSetTitleFromStart(startNumber) {
