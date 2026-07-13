@@ -1342,16 +1342,21 @@
 </style>
 
 <!-- ============================================================ -->
+
 <!-- BLOCK 07: JavaScript 로드 및 실행 -->
+
 <!-- ============================================================ -->
 
 <!-- 1. MathJax -->
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-chtml.js"></script>
 
-!-- 2. 공용 계산기 + 타이머 -->
+<!-- 2. 공용 계산기 + 타이머 -->
+
 <script src="./util/utils-loader.js?v=1.0"></script>
 
-<!-- 3. GitHub main.js 불러오기 + 초기화 -->
+<!-- 3. main.js 불러오기 + 초기화 -->
+
 <script type="module">
 import { initialize } from './main.js?v=8.0C';
 
@@ -1360,34 +1365,61 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 
-
+<!-- 4. 초기 화면의 Set 번호 표시 -->
 
 <script>
 (function() {
-  const MODE_TEXT = {<!-- ============================================================ -->
-<!-- BLOCK 07: JavaScript 로드 및 실행 -->
-<!-- ============================================================ -->
+  const MODE_TEXT = {
+    learn: '🟢 Learn · Answers and explanations are shown automatically.',
+    study: '🔵 Study · Choose a mode before or during the set.',
+    exam: '🔴 Exam · Feedback stays hidden until you submit the set.'
+  };
 
-<!-- 1. MathJax -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-chtml.js"></script>
+  function updateSetTitleFromStart(startNumber) {
+    const title = document.getElementById('currentSetTitle');
+    if (!title) return;
 
-<!-- 2. 공용 유틸리티 (계산기 + 타이머) -->
-<script src="./util/utils-loader.js?v=1.0"></script>
+    const start = Math.max(1, Number(startNumber) || 1);
+    title.textContent = String(Math.ceil(start / 120));
+  }
 
-<!-- 3. main.js 로드 -->
-<script type="module">
-import { initialize } from './main.js?v=8.0C';
+  function bindSetTitleUI() {
+    const setSelector = document.getElementById('setSelector');
+    const startInput = document.getElementById('startNumber');
+    const startButton = document.getElementById('startQuizBtn');
 
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 admin.html loaded');
-    try {
-        await initialize();
-        console.log('✅ initialize() completed');
-    } catch (err) {
-        console.error('❌ initialize() failed:', err);
+    if (setSelector) {
+      setSelector.addEventListener('change', function() {
+        const setNumber = Math.max(1, Number(this.value) || 1);
+        updateSetTitleFromStart(((setNumber - 1) * 120) + 1);
+      });
     }
-});
+
+    if (startInput) {
+      startInput.addEventListener('input', function() {
+        updateSetTitleFromStart(this.value);
+      });
+    }
+
+    if (startButton) {
+      startButton.addEventListener('click', function() {
+        updateSetTitleFromStart(startInput ? startInput.value : 1);
+      });
+    }
+
+    updateSetTitleFromStart(startInput ? startInput.value : 1);
+  }
+
+  function bindModePreviewUI() {
+    // main.js가 Learn / Study / Exam 모드 상태와 동작을 관리합니다.
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    bindSetTitleUI();
+  });
+})();
 </script>
+
 
 <!-- ============================================================ -->
 <!-- BLOCK 08: UI 설정 -->
