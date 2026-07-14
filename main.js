@@ -5874,10 +5874,12 @@ window.currentStartNumber = currentStartNumber;
 window.masterQuestions = masterQuestions;
 window.originalQuestions = originalQuestions;
 
-// 2. ES Module Export
+// ========================================================================
+// EXPORT
+// ========================================================================
+
 export {
     initialize,
-    logout,
     previewGraphic,
     renderGraphic,
     renderGeometry2D
