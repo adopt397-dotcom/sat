@@ -5220,15 +5220,20 @@ async function startQuizWithNumber(uiStartNumber) {
 }
 
 // ========================================================================
-// BLOCK 1510: 시스템 초기화 (Multi Subject 준비)
+// BLOCK 1510: 시스템 초기화 (Multi Subject 연결)
 // ========================================================================
+
 function initialize() {
 
-  console.log('🔧 initialize() started');
+
+  console.log(
+    '🔧 initialize() started'
+  );
+
 
 
   // =====================================================
-  // Multi Subject User Load
+  // Current User Load
   // =====================================================
 
   currentUser =
@@ -5237,9 +5242,12 @@ function initialize() {
     );
 
 
-  if (!currentUser) {
+  if(!currentUser){
+
     currentUser = {};
+
   }
+
 
 
   console.log(
@@ -5249,26 +5257,89 @@ function initialize() {
 
 
 
-  initDOM();
+  // =====================================================
+  // Multi Subject Load
+  // =====================================================
 
-  initLanguageSelector();
-
-  initModeSelector();
-
-  initTimer();
-
-  attachEvents();
+  (async function(){
 
 
+    try {
 
-  updateSplash(
-    10,
-    'Connecting to server.'
-  );
+
+      await loadSubjects();
 
 
 
-  (async function() {
+      if(
+        availableSubjects.length > 0
+      ){
+
+
+        let savedSubject =
+          localStorage.getItem(
+            'currentSubject'
+          )
+          ||
+          availableSubjects[0].CODE;
+
+
+
+        applySubjectConfig(
+          savedSubject
+        );
+
+
+      }
+      else {
+
+
+        console.warn(
+          '⚠️ No available subjects. Using default SAT.'
+        );
+
+
+      }
+
+
+
+    }
+    catch(error){
+
+
+      console.error(
+        '❌ Subject initialization failed:',
+        error
+      );
+
+
+    }
+
+
+
+    // =====================================================
+    // Existing Initialize Flow
+    // =====================================================
+
+
+    initDOM();
+
+    initLanguageSelector();
+
+    initModeSelector();
+
+    initTimer();
+
+    attachEvents();
+
+
+
+    updateSplash(
+      10,
+      'Connecting to server.'
+    );
+
+
 
     try {
 
@@ -5277,14 +5348,19 @@ function initialize() {
 
 
 
-      if (TOTAL_QUESTIONS === 0) {
+      if(
+        TOTAL_QUESTIONS === 0
+      ){
+
 
         TOTAL_QUESTIONS = 720;
+
 
         localStorage.setItem(
           TOTAL_CACHE_KEY,
           String(TOTAL_QUESTIONS)
         );
+
 
       }
 
@@ -5302,16 +5378,19 @@ function initialize() {
 
 
       console.log(
-        '📊 Total questions: ' + TOTAL_QUESTIONS
+        '📊 Total questions: '
+        +
+        TOTAL_QUESTIONS
       );
 
 
 
-      if (DOM.maxNumberSpan)
+      if(DOM.maxNumberSpan)
         DOM.maxNumberSpan.style.display = 'none';
 
 
-      if (DOM.maxNumberDisplay)
+
+      if(DOM.maxNumberDisplay)
         DOM.maxNumberDisplay.style.display = 'none';
 
 
@@ -5320,8 +5399,10 @@ function initialize() {
         '1-' + TOTAL_QUESTIONS;
 
 
+
       DOM.startNumberInput.max =
         TOTAL_QUESTIONS;
+
 
 
       DOM.startNumberInput.min =
@@ -5329,28 +5410,32 @@ function initialize() {
 
 
 
-      if (DOM.setSelector) {
+      if(DOM.setSelector){
 
 
         DOM.setSelector.addEventListener(
           'change',
-          function() {
+          function(){
 
 
             var setNum =
-              parseInt(this.value);
+              parseInt(
+                this.value
+              );
 
 
 
-            if (
+            if(
               !isNaN(setNum)
               &&
               setNum >= 1
-            ) {
+            ){
 
 
               var startNum =
-                (setNum - 1)
+                (
+                  setNum - 1
+                )
                 *
                 QUESTIONS_PER_SET
                 +
@@ -5362,34 +5447,12 @@ function initialize() {
                 startNum;
 
 
-
-              console.log(
-                'Set '
-                +
-                setNum
-                +
-                ' selected, starting from question '
-                +
-                startNum
-              );
-
             }
 
 
           }
         );
 
-
-
-        if (
-          DOM.setSelector.options.length > 0
-        ) {
-
-          DOM.setSelector.value = '1';
-
-          DOM.startNumberInput.value = '';
-
-        }
 
       }
 
@@ -5400,19 +5463,19 @@ function initialize() {
 
 
 
-      if (
-        saved
-        &&
-        saved.currentQuestions
-        &&
+      if(
+        saved &&
+        saved.currentQuestions &&
         saved.currentQuestions.length > 0
-      ) {
+      ){
 
 
         var answered =
           saved.userAnswers.filter(
             function(a){
+
               return a !== null;
+
             }
           ).length;
 
@@ -5444,8 +5507,9 @@ function initialize() {
       );
 
 
+
     }
-    catch(error) {
+    catch(error){
 
 
       console.error(
@@ -5462,7 +5526,10 @@ function initialize() {
     }
 
 
+
   })();
+
+
 
 }
 
