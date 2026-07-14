@@ -5875,36 +5875,12 @@ window.masterQuestions = masterQuestions;
 window.originalQuestions = originalQuestions;
 
 // 2. ES Module Export
-export { 
-  initialize, 
-  startQuizWithNumber, 
-  renderGraphic,
-  renderEquationGraph,
-  renderGeometry2D,
-  previewGraphic,
-  renderCurrentQuestion,
-  showExplanation,
-  goNext,
-  goPrev,
-  skipQuestion,
-  submitSubjective,
-  showResults,
-  showWrongAnswersList,
-  startWrongOnlyReview,
-  saveProgress,
-  loadProgress,
-  clearProgress,
-  ensureChartJS,
-  ensureThreeJS,
-  ensureMathJax,
-  ensureMathJS,
-  loadAllLibrariesInBackground,
-  showToast,
-  setLanguage,
-  setMode,
-  revealLearnAnswer,
-  LOG,
-  RendererManager
+export {
+    initialize,
+    logout,
+    previewGraphic,
+    renderGraphic,
+    renderGeometry2D
 };
 
 // ========================================================================
