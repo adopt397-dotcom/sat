@@ -81,7 +81,216 @@ var LANG = {
 
 };
 
+// ========================================================================
+// BLOCK 0110: Global State + DOM + Logger
+// ========================================================================
 
+
+// ========================================================================
+// DOM Reference
+// ========================================================================
+
+var DOM = {};
+
+
+
+// ========================================================================
+// Logger
+// ========================================================================
+
+var LOG = {
+
+    debug: function() {
+
+        console.log.apply(
+            console,
+            arguments
+        );
+
+    },
+
+
+    info: function() {
+
+        console.info.apply(
+            console,
+            arguments
+        );
+
+    },
+
+
+    warn: function() {
+
+        console.warn.apply(
+            console,
+            arguments
+        );
+
+    },
+
+
+    error: function() {
+
+        console.error.apply(
+            console,
+            arguments
+        );
+
+    }
+
+};
+
+
+
+// ========================================================================
+// User State
+// ========================================================================
+
+var currentUser =
+    JSON.parse(
+        localStorage.getItem('currentUser')
+        ||
+        'null'
+    )
+    ||
+    {};
+
+
+
+// ========================================================================
+// Subject State
+// ========================================================================
+
+var currentSubject =
+    localStorage.getItem(
+        'currentSubject'
+    )
+    ||
+    'SAT';
+
+
+var subjectConfig = null;
+
+
+var availableSubjects = [];
+
+
+
+// ========================================================================
+// Quiz Config
+// ========================================================================
+
+var DATA_SHEET = 'sat';
+
+var CURRENT_SUBJECT = '';
+
+var QUESTIONS_PER_SET = 120;
+
+var TOTAL_QUESTIONS = 0;
+
+
+
+// ========================================================================
+// Quiz Data
+// ========================================================================
+
+var masterQuestions = [];
+
+var currentQuestions = [];
+
+var originalQuestions = [];
+
+var userAnswers = [];
+
+var currentIndex = 0;
+
+var correctCount = 0;
+
+var isReviewMode = false;
+
+
+
+// ========================================================================
+// Storage
+// ========================================================================
+
+var STORAGE_KEY =
+    'quiz_progress_main_v8_0B';
+
+
+var TOTAL_CACHE_KEY =
+    'quiz_total_questions_v8_0B_sat';
+
+
+
+var LANGUAGE_STORAGE_KEY =
+    'quiz_language_v7';
+
+
+var MODE_STORAGE_KEY =
+    'quiz_mode_v8_0B';
+
+
+
+// ========================================================================
+// Language
+// ========================================================================
+
+var currentLanguage =
+    (
+        localStorage.getItem(
+            LANGUAGE_STORAGE_KEY
+        )
+        ||
+        'EN'
+    )
+    .toUpperCase();
+
+
+
+var SUPPORTED_LANGUAGES = [
+    'EN',
+    'KO'
+];
+
+
+
+// ========================================================================
+// Mode
+// ========================================================================
+
+var currentMode =
+    (
+        localStorage.getItem(
+            MODE_STORAGE_KEY
+        )
+        ||
+        'study'
+    )
+    .toLowerCase();
+
+
+
+var SUPPORTED_MODES = [
+    'learn',
+    'study',
+    'exam'
+];
+
+
+
+// ========================================================================
+// Renderer / Timer
+// ========================================================================
+
+var chartInstances = {};
+
+var autoSaveInterval = null;
+
+var learnRevealed = {};
+
+var examFinished = false;
 
 // ========================================================================
 // BLOCK 0120: 시스템 상수 + Multi Subject State
