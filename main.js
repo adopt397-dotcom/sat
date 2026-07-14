@@ -104,58 +104,41 @@ var ORIGINAL_API_URL = API_URL;
 // BLOCK 0130: Multi Subject 상태 관리
 // ========================================================================
 
-// 로그인 사용자 정보
+var currentUser =
+    JSON.parse(
+        localStorage.getItem('currentUser') || '{}'
+    );
 
 
-// 현재 선택 과목
-var currentSubject =
-    localStorage.getItem('currentSubject') || 'SAT';
-
-
-// 현재 과목 설정
 var subjectConfig = null;
 
 
-// 로그인 회원 구매 가능 과목 목록
 var availableSubjects = [];
 
 
-
 // ========================================================================
-// 기존 Quiz Engine 기본값 유지
+// 기존 SAT 기본값 유지
+// currentSubject 는 기존 main.js 선언 사용
 // ========================================================================
 
-// 기본 Sheet
 var DATA_SHEET = 'sat';
 
-
-// 기존 SAT API 필터 유지
 var CURRENT_SUBJECT = '';
 
-
-// 저장 Key
 var STORAGE_KEY = 'quiz_progress_main_v8_0B';
 
-
-// 문제 수 Cache
 var TOTAL_CACHE_KEY = 'quiz_total_questions_v8_0B_sat';
 
-
-// 언어 저장
 var LANGUAGE_STORAGE_KEY = 'quiz_language_v7';
 
-
-// Mode 저장
 var MODE_STORAGE_KEY = 'quiz_mode_v8_0B';
 
 
-// 지원 모드
 var SUPPORTED_MODES = [
     'learn',
     'study',
     'exam'
 ];
-
 
 
 var currentMode =
@@ -169,7 +152,6 @@ var currentMode =
     .toLowerCase();
 
 
-
 if(
     SUPPORTED_MODES.indexOf(currentMode)
     < 0
@@ -178,7 +160,6 @@ if(
     currentMode = 'study';
 
 }
-
 
 
 var learnRevealed = {};
@@ -206,7 +187,6 @@ var currentLanguage =
         'EN'
     )
     .toUpperCase();
-
 
 
 if(
@@ -247,21 +227,6 @@ var currentStartNumber = 1;
 var autoSaveInterval = null;
 
 var chartInstances = {};
-
-var DOM = {};
-
-// ======================================================================
-// BLOCK 0130: MULTI SUBJECT STATE
-// ======================================================================
-
-let currentUser = null;
-
-let currentSubject = "SAT";
-
-let subjectConfig = null;
-
-let availableSubjects = [];
-
 
 // ========================================================================
 // BLOCK 0200: CDN 폴백 체계
