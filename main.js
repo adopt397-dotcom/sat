@@ -5113,114 +5113,251 @@ async function startQuizWithNumber(uiStartNumber) {
 }
 
 // ========================================================================
-// BLOCK 1510: 시스템 초기화 (원본 B012 initialize)
+// BLOCK 1510: 시스템 초기화 (Multi Subject 준비)
 // ========================================================================
 function initialize() {
+
   console.log('🔧 initialize() started');
-  
+
+
+  // =====================================================
+  // Multi Subject User Load
+  // =====================================================
+
+  currentUser =
+    JSON.parse(
+      localStorage.getItem('currentUser') || 'null'
+    );
+
+
+  if (!currentUser) {
+    currentUser = {};
+  }
+
+
+  console.log(
+    '👤 Current User:',
+    currentUser
+  );
+
+
+
   initDOM();
+
   initLanguageSelector();
+
   initModeSelector();
+
   initTimer();
+
   attachEvents();
 
-  updateSplash(10, 'Connecting to server...');
-  
-  (async function() {
-    try {
-      await detectTotalQuestions();
-      
-      if (TOTAL_QUESTIONS === 0) {
-        TOTAL_QUESTIONS = 720;
-        localStorage.setItem(TOTAL_CACHE_KEY, String(TOTAL_QUESTIONS));
-      }
-      
-      updateSetSelector();
-      
-      updateSplash(60, 'Preparing data...');
-      
-      var maxStartNumber = TOTAL_QUESTIONS;
-      console.log('📊 Total questions: ' + TOTAL_QUESTIONS);
-      
-      if (DOM.maxNumberSpan) DOM.maxNumberSpan.style.display = 'none';
-      if (DOM.maxNumberDisplay) DOM.maxNumberDisplay.style.display = 'none';
-      
-      DOM.startNumberInput.placeholder = '1-' + TOTAL_QUESTIONS;
-      DOM.startNumberInput.max = TOTAL_QUESTIONS;
-      DOM.startNumberInput.min = 1;
-      
-      if (DOM.setSelector) {
-        DOM.setSelector.addEventListener('change', function() {
-          var setNum = parseInt(this.value);
-          if (!isNaN(setNum) && setNum >= 1) {
-            var startNum = (setNum - 1) * QUESTIONS_PER_SET + 1;
-            DOM.startNumberInput.value = startNum;
-            console.log('Set ' + setNum + ' selected, starting from question ' + startNum);
-          }
-        });
-        if (DOM.setSelector.options.length > 0) {
-          DOM.setSelector.value = '1';
-          DOM.startNumberInput.value = '';
-        }
-      }
-      
-      var saved = loadProgress();
-      if (saved && saved.currentQuestions && saved.currentQuestions.length > 0) {
-        var answered = saved.userAnswers.filter(function(a) { return a !== null && a !== -1; }).length;
-        var timeStr = new Date(saved.timestamp).toLocaleString();
-        DOM.savedBadgeContainer.innerHTML =
-          '<div class="resume-badge" id="resumeBadge">' +
-          '<div class="count">' + answered + ' / ' + saved.currentQuestions.length + ' answered</div>' +
-          '<div class="time">' + timeStr + '</div>' +
-          '<div class="hint">Click to resume</div>' +
-          '</div>';
-        var resumeBadge = document.getElementById('resumeBadge');
-        if (resumeBadge) {
-          resumeBadge.addEventListener('click', function(e) {
-            e.stopPropagation();
-            var savedData = loadProgress();
-            if (savedData) showProgressModal(savedData);
-          });
-        }
-        var resumeCard = document.getElementById('resumeCard');
-        if (resumeCard) {
-          var newCard = resumeCard.cloneNode(true);
-          resumeCard.parentNode.replaceChild(newCard, resumeCard);
-          newCard.addEventListener('click', function() {
-            var savedData = loadProgress();
-            if (savedData) showProgressModal(savedData);
-          });
-        }
-      } else {
-        DOM.savedBadgeContainer.innerHTML = '<div class="no-session">' +
-          'No saved session' +
-          '<small>Start a new lesson</small>' +
-          '</div>';
-      }
-      
-      updateSplash(100, 'Ready!');
-      
-      hideSplash();
-      DOM.setupSection.style.display = 'block';
-      DOM.quizMain.style.display = 'block';
-      
-      setTimeout(function() { 
-        if (DOM.startNumberInput) {
-          DOM.startNumberInput.focus(); 
-          DOM.startNumberInput.select(); 
-        }
-      }, 150);
-      
-      console.log('✅ Initialization complete: ' + TOTAL_QUESTIONS + ' total questions');
-      
-    } catch(e) {
-      console.error('Initialization error:', e);
-      showSplashError(e.message || 'Initialization failed');
-    }
-  })();
-}
 
-window.renderWithEditingMarks = renderWithEditingMarks;
+
+  updateSplash(
+    10,
+    'Connecting to server.'
+  );
+
+
+
+  (async function() {
+
+    try {
+
+
+      await detectTotalQuestions();
+
+
+
+      if (TOTAL_QUESTIONS === 0) {
+
+        TOTAL_QUESTIONS = 720;
+
+        localStorage.setItem(
+          TOTAL_CACHE_KEY,
+          String(TOTAL_QUESTIONS)
+        );
+
+      }
+
+
+
+      updateSetSelector();
+
+
+
+      updateSplash(
+        60,
+        'Preparing data.'
+      );
+
+
+
+      console.log(
+        '📊 Total questions: ' + TOTAL_QUESTIONS
+      );
+
+
+
+      if (DOM.maxNumberSpan)
+        DOM.maxNumberSpan.style.display = 'none';
+
+
+      if (DOM.maxNumberDisplay)
+        DOM.maxNumberDisplay.style.display = 'none';
+
+
+
+      DOM.startNumberInput.placeholder =
+        '1-' + TOTAL_QUESTIONS;
+
+
+      DOM.startNumberInput.max =
+        TOTAL_QUESTIONS;
+
+
+      DOM.startNumberInput.min =
+        1;
+
+
+
+      if (DOM.setSelector) {
+
+
+        DOM.setSelector.addEventListener(
+          'change',
+          function() {
+
+
+            var setNum =
+              parseInt(this.value);
+
+
+
+            if (
+              !isNaN(setNum)
+              &&
+              setNum >= 1
+            ) {
+
+
+              var startNum =
+                (setNum - 1)
+                *
+                QUESTIONS_PER_SET
+                +
+                1;
+
+
+
+              DOM.startNumberInput.value =
+                startNum;
+
+
+
+              console.log(
+                'Set '
+                +
+                setNum
+                +
+                ' selected, starting from question '
+                +
+                startNum
+              );
+
+            }
+
+
+          }
+        );
+
+
+
+        if (
+          DOM.setSelector.options.length > 0
+        ) {
+
+          DOM.setSelector.value = '1';
+
+          DOM.startNumberInput.value = '';
+
+        }
+
+      }
+
+
+
+      var saved =
+        loadProgress();
+
+
+
+      if (
+        saved
+        &&
+        saved.currentQuestions
+        &&
+        saved.currentQuestions.length > 0
+      ) {
+
+
+        var answered =
+          saved.userAnswers.filter(
+            function(a){
+              return a !== null;
+            }
+          ).length;
+
+
+
+        showResumePrompt(
+          saved,
+          answered
+        );
+
+
+      }
+
+
+
+      updateSplash(
+        100,
+        'Ready!'
+      );
+
+
+
+      console.log(
+        '✅ Initialization complete: '
+        +
+        TOTAL_QUESTIONS
+        +
+        ' total questions'
+      );
+
+
+    }
+    catch(error) {
+
+
+      console.error(
+        '❌ Initialize failed:',
+        error
+      );
+
+
+      showSplashError(
+        error.message
+      );
+
+
+    }
+
+
+  })();
+
+}
 
 // ========================================================================
 // BLOCK 1590: 콘솔 그래픽 미리보기 도구
