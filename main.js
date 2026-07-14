@@ -125,6 +125,19 @@ var autoSaveInterval = null;
 var chartInstances = {};
 var DOM = {};
 
+// ======================================================================
+// BLOCK 0130: MULTI SUBJECT STATE
+// ======================================================================
+
+let currentUser = null;
+
+let currentSubject = "SAT";
+
+let subjectConfig = null;
+
+let availableSubjects = [];
+
+
 // ========================================================================
 // BLOCK 0200: CDN 폴백 체계
 // ========================================================================
@@ -1012,6 +1025,49 @@ function renderLearnPanel(q, displayAnswer) {
   // 객관식 Learn에서는 정답 선택지가 이미 초록색으로 표시되므로
   // 중복되는 Correct Answer 안내 박스를 출력하지 않는다.
   return '';
+}
+// ======================================================================
+// BLOCK 0690: SUBJECT MANAGER
+// ======================================================================
+
+function setCurrentSubject(config) {
+
+    if (!config) {
+        return false;
+    }
+
+
+    subjectConfig = config;
+
+
+    currentSubject = config.CODE;
+
+
+    if (config.SHEET) {
+
+        DATA_SHEET = config.SHEET;
+
+    }
+
+
+    if (config.SET_SIZE) {
+
+        QUESTIONS_PER_SET =
+            Number(config.SET_SIZE);
+
+    }
+
+
+    console.log(
+        "📚 Current Subject:",
+        currentSubject,
+        DATA_SHEET,
+        QUESTIONS_PER_SET
+    );
+
+
+    return true;
+
 }
 
 // ========================================================================
