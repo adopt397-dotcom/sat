@@ -15,179 +15,71 @@
 // ========================================================================
 
 // ========================================================================
-// BLOCK 0100: 로깅 시스템
-// ========================================================================
-const LOG = {
-    level: 'debug',
-    _log(level, ...args) {
-        if (this.level === 'none') return;
-        const levels = ['debug', 'info', 'warn', 'error'];
-        if (levels.indexOf(level) < levels.indexOf(this.level)) return;
-        console[level === 'debug' ? 'log' : level](`[${level.toUpperCase()}]`, ...args);
-    },
-    debug(...args) { this._log('debug', ...args); },
-    info(...args) { this._log('info', ...args); },
-    warn(...args) { this._log('warn', ...args); },
-    error(...args) { this._log('error', ...args); }
-};
-
-// ========================================================================
-// BLOCK 0110: Global State + DOM Reference
+// BLOCK 0100: Language Global
 // ========================================================================
 
-
-// ========================================================================
-// DOM Reference
-// ========================================================================
-
-var DOM = {};
-
-
-
-// ========================================================================
-// Quiz State
-// ========================================================================
-
-var currentQuestions = [];
-
-var masterQuestions = [];
-
-var originalQuestions = [];
-
-var userAnswers = [];
-
-var currentIndex = 0;
-
-var correctCount = 0;
-
-
-
-// ========================================================================
-// Subject State
-// ========================================================================
-
-var currentSubject =
-    localStorage.getItem('currentSubject')
-    ||
-    'SAT';
-
-
-var subjectConfig = null;
-
-
-var availableSubjects = [];
-
-
-
-// ========================================================================
-// User State
-// ========================================================================
-
-var currentUser =
-    JSON.parse(
-        localStorage.getItem('currentUser')
-        ||
-        'null'
-    )
-    ||
-    {};
-
-
-
-// ========================================================================
-// Quiz Config
-// ========================================================================
-
-var QUESTIONS_PER_SET = 120;
-
-var TOTAL_QUESTIONS = 0;
-
-var DATA_SHEET = 'sat';
-
-var CURRENT_SUBJECT = '';
-
-
-
-// ========================================================================
-// Storage
-// ========================================================================
-
-var STORAGE_KEY =
-    'quiz_progress_main_v8_0B';
-
-
-var TOTAL_CACHE_KEY =
-    'quiz_total_questions_v8_0B_sat';
-
-
-
-// ========================================================================
-// Mode / Language
-// ========================================================================
-
-var LANGUAGE_STORAGE_KEY =
-    'quiz_language_v7';
-
-
-var MODE_STORAGE_KEY =
-    'quiz_mode_v8_0B';
-
-
-var currentLanguage =
-    localStorage.getItem(
-        LANGUAGE_STORAGE_KEY
-    )
-    ||
-    'EN';
-
-
-var currentMode =
-    localStorage.getItem(
-        MODE_STORAGE_KEY
-    )
-    ||
-    'study';
-
-
-
-// ========================================================================
-// Renderer / Timer State
-// ========================================================================
-
-var chartInstances = {};
-
-var autoSaveInterval = null;
-
-var isReviewMode = false;
-
-var examFinished = false;
-
-var learnRevealed = {};
-
-// ========================================================================
-// Language Text Object
-// ========================================================================
 
 var LANG = {
 
+
     qPrefix: 'Question',
+
     of: 'of',
+
     originalPrefix: ' (Original #',
+
     originalSuffix: ')',
 
+
+
     correct: 'Correct',
+
     incorrect: 'Incorrect',
+
     explanation: 'Explanation',
 
+
+
     next: 'Next',
+
     previous: 'Previous',
+
     submit: 'Submit',
 
+
+
     loading: 'Loading...',
-    ready: 'Ready'
+
+    ready: 'Ready',
+
+
+
+    login: 'Login',
+
+    logout: 'Logout',
+
+
+
+    score: 'Score',
+
+    progress: 'Progress',
+
+
+
+    review: 'Review',
+
+    retry: 'Retry',
+
+    skipped: 'Skipped',
+
+
+
+    noData: 'No data',
+
+    error: 'Error'
+
 
 };
-
 
 
 
