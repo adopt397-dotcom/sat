@@ -155,7 +155,7 @@ function applySubjectConfig() {
         QUESTION_COUNT: 1440
       };
     } else {
-      window.location.replace('./login.html?v=8.0C12-TIMER1');
+      window.location.replace('./login.html?v=8.0C12-TIMER2');
       return false;
     }
   }
@@ -1848,7 +1848,6 @@ function updateTimerDisplay() {
   }
   if (DOM.calculatorTimerMirror) DOM.calculatorTimerMirror.textContent = formatted;
   if (DOM.headerTimerDisplay) DOM.headerTimerDisplay.textContent = formatted;
-  if (DOM.timerToggle) DOM.timerToggle.classList.toggle('timer-active', timerRunning);
   if (DOM.timerPauseBtn) DOM.timerPauseBtn.textContent = timerRunning ? '⏸ Pause' : (timerPaused ? '▶ Resume' : '▶ Start');
 }
 
