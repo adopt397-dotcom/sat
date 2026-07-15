@@ -155,7 +155,7 @@ function applySubjectConfig() {
         QUESTION_COUNT: 1440
       };
     } else {
-      window.location.replace('./login.html?v=8.0C12-TIMER3');
+      window.location.replace('./login.html?v=8.0C12-TIMER4');
       return false;
     }
   }
@@ -2014,7 +2014,11 @@ function initTimer() {
   updateTimerDisplay();
   if (DOM.timerPauseBtn) DOM.timerPauseBtn.addEventListener('click', function() {
     pauseTimer();
-    if (timerRunning) closeQuizTools();
+    if (timerRunning) {
+      if (DOM.timerPanel) DOM.timerPanel.hidden = true;
+      if (DOM.timerToggle) DOM.timerToggle.setAttribute('aria-expanded', 'false');
+      updateTimerDisplay();
+    }
   });
   if (DOM.timerResetBtn) DOM.timerResetBtn.addEventListener('click', resetTimer);
   if (DOM.timerSetBtn) DOM.timerSetBtn.addEventListener('click', setTimerFromInputs);
