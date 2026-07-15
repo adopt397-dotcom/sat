@@ -155,7 +155,7 @@ function applySubjectConfig() {
         QUESTION_COUNT: 1440
       };
     } else {
-      window.location.replace('./login.html?v=8.0C12-TOOLS1');
+      window.location.replace('./login.html?v=8.0C12-TIMER1');
       return false;
     }
   }
@@ -1848,6 +1848,7 @@ function updateTimerDisplay() {
   }
   if (DOM.calculatorTimerMirror) DOM.calculatorTimerMirror.textContent = formatted;
   if (DOM.headerTimerDisplay) DOM.headerTimerDisplay.textContent = formatted;
+  if (DOM.timerToggle) DOM.timerToggle.classList.toggle('timer-active', timerRunning);
   if (DOM.timerPauseBtn) DOM.timerPauseBtn.textContent = timerRunning ? '⏸ Pause' : (timerPaused ? '▶ Resume' : '▶ Start');
 }
 
@@ -2004,10 +2005,11 @@ function initTimer() {
   if (quizToolsInitialized) return;
   quizToolsInitialized = true;
   updateTimerDisplay();
-  if (DOM.timerPauseBtn) DOM.timerPauseBtn.addEventListener('click', pauseTimer);
-  if (DOM.timerResetBtn) DOM.timerResetBtn.addEventListener('click', function() {
-    if (confirm('Reset timer?')) resetTimer();
+  if (DOM.timerPauseBtn) DOM.timerPauseBtn.addEventListener('click', function() {
+    pauseTimer();
+    if (timerRunning) closeQuizTools();
   });
+  if (DOM.timerResetBtn) DOM.timerResetBtn.addEventListener('click', resetTimer);
   if (DOM.timerSetBtn) DOM.timerSetBtn.addEventListener('click', setTimerFromInputs);
   if (DOM.calculatorToggle) DOM.calculatorToggle.addEventListener('click', function() { toggleQuizTool(DOM.calculatorPanel, DOM.calculatorToggle); });
   if (DOM.timerToggle) DOM.timerToggle.addEventListener('click', function() { toggleQuizTool(DOM.timerPanel, DOM.timerToggle); });
