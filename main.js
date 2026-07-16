@@ -155,7 +155,7 @@ function applySubjectConfig() {
         QUESTION_COUNT: 1440
       };
     } else {
-      window.location.replace('./login.html?v=8.0C12-TIMER8');
+      window.location.replace('./login.html?v=8.0C12-TIMER9');
       return false;
     }
   }
@@ -1900,11 +1900,12 @@ function resetTimer(clearConfiguration) {
   }
   if (clearConfiguration === true) {
     timerConfiguredSeconds = 0;
-    if (DOM.timerHours) DOM.timerHours.value = '';
-    if (DOM.timerMinutes) DOM.timerMinutes.value = '';
-    if (DOM.timerSecondsInput) DOM.timerSecondsInput.value = '';
+    timerEndsAt = 0;
+    if (DOM.timerHours) DOM.timerHours.value = '0';
+    if (DOM.timerMinutes) DOM.timerMinutes.value = '0';
+    if (DOM.timerSecondsInput) DOM.timerSecondsInput.value = '0';
   }
-  timerSeconds = timerConfiguredSeconds;
+  timerSeconds = clearConfiguration === true ? 0 : timerConfiguredSeconds;
   timerRunning = false;
   timerPaused = false;
   updateTimerDisplay();
