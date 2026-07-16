@@ -47,7 +47,7 @@
     <div class="quiz-tools" aria-label="Quiz tools">
       <button type="button" id="calculatorToggle" class="quiz-tool-toggle" aria-label="Open calculator" aria-controls="calculatorPanel" aria-expanded="false">🧮</button>
     </div>
-    <button type="button" id="timerToggle" class="quiz-tool-toggle quiz-timer-toggle persistent-timer-toggle" aria-label="Open timer" aria-controls="timerPanel" aria-expanded="false"><span aria-hidden="true">⏱️</span><span id="headerTimerDisplay" class="header-timer-display">02:14:00</span></button>
+    <button type="button" id="timerToggle" class="quiz-tool-toggle quiz-timer-toggle persistent-timer-toggle" aria-label="Open timer" aria-controls="timerPanel" aria-expanded="false"><span aria-hidden="true">⏱️</span><span id="headerTimerDisplay" class="header-timer-display">00:00:00</span></button>
     <section id="calculatorPanel" class="quiz-tool-panel calculator-panel" aria-label="Scientific calculator" hidden>
       <div class="tool-panel-head"><span>Scientific Calculator</span><span id="calculatorTimerMirror" class="calculator-timer-mirror">02:14:00</span><button type="button" class="tool-close" data-close-tool aria-label="Close calculator">×</button></div>
       <div id="calculatorExpression" class="calculator-expression" aria-live="polite"></div>
@@ -65,8 +65,8 @@
     </section>
     <section id="timerPanel" class="quiz-tool-panel timer-tool-panel" aria-label="Quiz timer" hidden>
       <div class="tool-panel-head"><span>Timer</span><button type="button" class="tool-close" data-close-tool aria-label="Close timer">×</button></div>
-      <div class="timer-display" id="timerDisplay" aria-live="polite">02:14:00</div><div class="timer-label">Time Remaining</div>
-      <div class="timer-setting" aria-label="Set timer duration"><label>HH<input id="timerHours" type="number" min="0" max="99" value="2" inputmode="numeric"></label><span>:</span><label>MM<input id="timerMinutes" type="number" min="0" max="59" value="14" inputmode="numeric"></label><span>:</span><label>SS<input id="timerSecondsInput" type="number" min="0" max="59" value="0" inputmode="numeric"></label><button type="button" id="timerSetBtn" class="timer-set-btn">Set</button></div>
+      <div class="timer-display" id="timerDisplay" aria-live="polite">00:00:00</div><div class="timer-label">Time Remaining</div>
+      <div class="timer-setting" aria-label="Set timer duration"><label>HH<input id="timerHours" type="number" min="0" max="99" value="" placeholder="00" inputmode="numeric"></label><span>:</span><label>MM<input id="timerMinutes" type="number" min="0" max="59" value="" placeholder="00" inputmode="numeric"></label><span>:</span><label>SS<input id="timerSecondsInput" type="number" min="0" max="59" value="" placeholder="00" inputmode="numeric"></label><button type="button" id="timerSetBtn" class="timer-set-btn">Set</button></div>
       <div class="timer-controls"><button type="button" class="timer-btn" id="timerPauseBtn">▶ Start</button><button type="button" class="timer-btn reset-btn" id="timerResetBtn">↺ Reset</button></div>
     </section>
 
@@ -1381,7 +1381,7 @@
 
 <!-- 2. GitHub main.js 불러오기 + 초기화 -->
 <script type="module">
-import { initialize } from './main.js?v=8.0C12-TIMER6';
+import { initialize } from './main.js?v=8.0C12-TIMER7';
 
 document.addEventListener('DOMContentLoaded', () => {
   initialize();

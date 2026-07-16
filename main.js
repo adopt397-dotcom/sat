@@ -155,7 +155,7 @@ function applySubjectConfig() {
         QUESTION_COUNT: 1440
       };
     } else {
-      window.location.replace('./login.html?v=8.0C12-TIMER6');
+      window.location.replace('./login.html?v=8.0C12-TIMER7');
       return false;
     }
   }
@@ -1821,7 +1821,7 @@ function startWrongOnlyReview() {
 // ========================================================================
 // BLOCK 1000: 타이머 함수 (원본 B010)
 // ========================================================================
-var TIMER_DEFAULT_SECONDS = 134 * 60;
+var TIMER_DEFAULT_SECONDS = 0;
 var timerConfiguredSeconds = TIMER_DEFAULT_SECONDS;
 var timerSeconds = timerConfiguredSeconds;
 var timerInterval = null;
@@ -1909,7 +1909,6 @@ function setTimerFromInputs() {
   var minutes = Math.max(0, Math.min(59, parseInt(DOM.timerMinutes && DOM.timerMinutes.value, 10) || 0));
   var seconds = Math.max(0, Math.min(59, parseInt(DOM.timerSecondsInput && DOM.timerSecondsInput.value, 10) || 0));
   var total = hours * 3600 + minutes * 60 + seconds;
-  if (!total) { alert('Set a timer longer than 00:00:00.'); return; }
   timerConfiguredSeconds = total;
   if (DOM.timerHours) DOM.timerHours.value = hours;
   if (DOM.timerMinutes) DOM.timerMinutes.value = minutes;
@@ -2022,6 +2021,11 @@ function initTimer() {
   });
   if (DOM.timerResetBtn) DOM.timerResetBtn.addEventListener('click', resetTimer);
   if (DOM.timerSetBtn) DOM.timerSetBtn.addEventListener('click', setTimerFromInputs);
+  [DOM.timerHours, DOM.timerMinutes, DOM.timerSecondsInput].forEach(function(input) {
+    if (!input) return;
+    input.addEventListener('focus', function() { this.select(); });
+    input.addEventListener('click', function() { this.select(); });
+  });
   if (DOM.calculatorToggle) DOM.calculatorToggle.addEventListener('click', function() { toggleQuizTool(DOM.calculatorPanel, DOM.calculatorToggle); });
   if (DOM.timerToggle) DOM.timerToggle.addEventListener('click', function() { toggleQuizTool(DOM.timerPanel, DOM.timerToggle); });
   document.querySelectorAll('[data-close-tool]').forEach(function(button) { button.addEventListener('click', closeQuizTools); });
@@ -5123,8 +5127,7 @@ async function startQuizWithNumber(uiStartNumber) {
     loadAllLibrariesInBackground();
     
     resetTimer();
-    if (currentMode === 'exam') startTimer();
-    else pauseTimer();
+    // Timer always waits for the student's explicit Set and Start action.
     
   } catch(err) {
     if (err.name === 'AbortError') {
