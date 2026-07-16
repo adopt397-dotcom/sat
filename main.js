@@ -155,7 +155,7 @@ function applySubjectConfig() {
         QUESTION_COUNT: 1440
       };
     } else {
-      window.location.replace('./login.html?v=8.0C12-TIMER11');
+      window.location.replace('./login.html?v=8.0C12-TIMER12');
       return false;
     }
   }
@@ -776,7 +776,10 @@ function loadProgress() {
     if (!raw) return null;
     var data = JSON.parse(raw);
     if (data.currentLanguage) setLanguage(data.currentLanguage, false);
-    if (data.currentMode) currentMode = normalizeMode(data.currentMode);
+    // Reading a saved session must not change the mode currently selected in
+    // the UI. The saved mode is restored only when the student explicitly
+    // chooses Continue (see resumeProgress). Otherwise an old Learn session
+    // can make a visibly selected Study session reveal every answer.
     if (data.learnRevealed && typeof data.learnRevealed === 'object') learnRevealed = data.learnRevealed;
     examFinished = !!data.examFinished;
     if (data.cdnLoaded) {
