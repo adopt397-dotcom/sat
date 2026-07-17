@@ -9,7 +9,7 @@
 // ========================================================================
 // BLOCK 0000: 시스템 메타 정보
 // ========================================================================
-// 버전: 8.0E (FREE TRIAL only after signup/login)
+// 버전: 8.0D (Trial / Paid / Admin Auth)
 // 날짜: 2026-07-12
 // 설명: 표준 다국어 스키마 + 언어 전환 + 기존 그래픽/퀴즈 엔진 통합
 // 표준 열: N, SUBJECT, Q_EN, Q_KO, P_EN, P_KO, 1_EN~4_KO, A, E_EN, E_KO, G, D,
@@ -105,8 +105,12 @@ var subjectConfig = null;
 var availableSubjects = [];
 var DATA_SHEET = 'sat';
 var CURRENT_SUBJECT = '';
-var STORAGE_KEY = 'quiz_progress_main_v8_0E_sat';
-var TOTAL_CACHE_KEY = 'quiz_total_questions_v8_0E_sat';
+var STORAGE_KEY = 'quiz_progress_main_v8_0C_sat';
+var TOTAL_CACHE_KEY = 'quiz_total_questions_v8_0D_sat';
+var IS_TRIAL_USER = false;
+var IS_ADMIN_USER = false;
+var TRIAL_START = 1;
+var TRIAL_LIMIT = 20;
 var LANGUAGE_STORAGE_KEY = 'quiz_language_v7';
 var MODE_STORAGE_KEY = 'quiz_mode_v8_0B';
 var SUPPORTED_MODES = ['learn', 'study', 'exam'];
@@ -132,59 +136,62 @@ var autoSaveInterval = null;
 var chartInstances = {};
 var DOM = {};
 
-
-// BLOCK 2010: Role-based content protection
-var contentProtectionHandlersAttached = false;
-
-function isAdministrator_() {
-  return Boolean(currentUser && String(currentUser.account_type || '').toLowerCase() === 'admin');
+// BLOCK 2000: Login/Auth validation and role policy
+function normalizeRoleValue(value) {
+  return String(value || '').trim().toLowerCase();
 }
 
-function isTrialUser_() {
-  if (isAdministrator_()) return false;
-  return Boolean(
-    (currentUser && (currentUser.is_sample || String(currentUser.access_level || '').toLowerCase() === 'trial' || String(currentUser.payment_status || '').toLowerCase() === 'p')) ||
-    (subjectConfig && (subjectConfig.SAMPLE || subjectConfig.TRIAL))
-  );
+function hasValidCurrentUser(user) {
+  return !!(user && typeof user === 'object' && String(user.email || '').trim());
 }
 
-function blockProtectedAction_(event) {
-  if (!document.body.classList.contains('content-protected')) return;
-  var target = event.target;
-  var tag = target && target.tagName ? target.tagName.toUpperCase() : '';
-  var editable = target && (target.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA');
-  if (editable && (event.type === 'copy' || event.type === 'cut' || event.type === 'paste' || event.type === 'selectstart')) return;
-  event.preventDefault();
+function isAdminUser(user) {
+  return normalizeRoleValue(user && user.account_type) === 'admin';
 }
 
-function blockProtectedShortcut_(event) {
-  if (!document.body.classList.contains('content-protected')) return;
-  var key = String(event.key || '').toLowerCase();
-  var command = event.ctrlKey || event.metaKey;
-  if ((command && ['c', 'x', 'a', 's', 'u', 'p'].indexOf(key) >= 0) || event.key === 'F12') {
-    var tag = event.target && event.target.tagName ? event.target.tagName.toUpperCase() : '';
-    var editable = event.target && (event.target.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA');
-    if (editable && command && ['c', 'x', 'a'].indexOf(key) >= 0) return;
-    event.preventDefault();
-  }
+function isTrialUser(user) {
+  if (!user || isAdminUser(user)) return false;
+  return user.is_trial === true || normalizeRoleValue(user.payment_status) === 'p';
 }
 
-function initializeContentProtection_() {
-  var admin = isAdministrator_();
-  document.body.classList.toggle('content-protected', !admin);
-  document.body.dataset.accountType = admin ? 'admin' : 'member';
+function clearAuthAndRedirect() {
+  localStorage.removeItem('quiz_current_user_v1');
+  localStorage.removeItem('quiz_available_subjects_v1');
+  localStorage.removeItem('quiz_current_subject_v1');
+  window.location.replace('./login.html?v=8.0D');
+}
 
-  if (!contentProtectionHandlersAttached) {
-    ['contextmenu', 'copy', 'cut', 'paste', 'dragstart', 'selectstart'].forEach(function(type) {
-      document.addEventListener(type, blockProtectedAction_);
-    });
-    document.addEventListener('keydown', blockProtectedShortcut_);
-    contentProtectionHandlersAttached = true;
-  }
+function applyUserRolePolicy() {
+  IS_ADMIN_USER = isAdminUser(currentUser);
+  IS_TRIAL_USER = isTrialUser(currentUser);
+  TRIAL_START = Math.max(1, parseInt(currentUser && currentUser.trial_start, 10) || 1);
+  TRIAL_LIMIT = Math.max(1, parseInt(currentUser && currentUser.trial_limit, 10) || 20);
+  document.documentElement.classList.toggle('admin-user', IS_ADMIN_USER);
+  document.documentElement.classList.toggle('trial-user', IS_TRIAL_USER);
+}
 
-  console.log(admin
-    ? '🔓 Administrator mode: copy/paste restrictions disabled.'
-    : '🔒 Member mode: content protection enabled.');
+function applyCopyProtectionPolicy() {
+  if (window.__gongbooCopyProtectionInstalled) return;
+  window.__gongbooCopyProtectionInstalled = true;
+  ['copy', 'cut', 'paste', 'contextmenu', 'selectstart'].forEach(function(type) {
+    document.addEventListener(type, function(event) {
+      if (IS_ADMIN_USER) return;
+      var tag = event.target && event.target.tagName;
+      if ((type === 'paste' || type === 'cut') && (tag === 'INPUT' || tag === 'TEXTAREA')) return;
+      event.preventDefault();
+    }, true);
+  });
+}
+
+function isTrialProgressSafe(saved) {
+  if (!IS_TRIAL_USER) return true;
+  if (!saved || !Array.isArray(saved.currentQuestions)) return false;
+  if ((parseInt(saved.currentStartNumber, 10) || 1) !== TRIAL_START) return false;
+  if (saved.currentQuestions.length > TRIAL_LIMIT) return false;
+  return saved.currentQuestions.every(function(q, index) {
+    var n = parseInt(q && (q.originalNumber || q.N || q.n), 10);
+    return isNaN(n) ? index < TRIAL_LIMIT : n >= TRIAL_START && n < TRIAL_START + TRIAL_LIMIT;
+  });
 }
 
 // BLOCK 3000: Subject Management
@@ -198,8 +205,14 @@ function applySubjectConfig() {
     availableSubjects = [];
     subjectConfig = null;
   }
+  if (!hasValidCurrentUser(currentUser)) {
+    clearAuthAndRedirect();
+    return false;
+  }
+  applyUserRolePolicy();
+  applyCopyProtectionPolicy();
   if (!subjectConfig || !subjectConfig.CODE || !subjectConfig.SHEET) {
-    window.location.replace('./login.html?v=8.0E-TRIAL-AFTER-SIGNUP');
+    window.location.replace('./login.html?v=8.0D');
     return false;
   }
   currentSubject = String(subjectConfig.CODE).trim().toUpperCase();
@@ -210,17 +223,11 @@ function applySubjectConfig() {
   };
   DATA_SHEET = sheetAliases[DATA_SHEET.toUpperCase()] || DATA_SHEET.toLowerCase();
   QUESTIONS_PER_SET = Math.max(1, parseInt(subjectConfig.SET_SIZE, 10) || 120);
+  if (IS_TRIAL_USER) QUESTIONS_PER_SET = TRIAL_LIMIT;
   TOTAL_QUESTIONS = Math.max(0, parseInt(subjectConfig.QUESTION_COUNT, 10) || 0);
-  if (isTrialUser_()) {
-    subjectConfig.SAMPLE = true;
-    subjectConfig.TRIAL = true;
-    subjectConfig.SAMPLE_LIMIT = 20;
-    QUESTIONS_PER_SET = 20;
-    TOTAL_QUESTIONS = Math.min(20, TOTAL_QUESTIONS || 20);
-  }
   var keyPart = currentSubject.replace(/[^A-Z0-9_-]/g, '_');
-  STORAGE_KEY = 'quiz_progress_main_v8_0E_' + keyPart;
-  TOTAL_CACHE_KEY = 'quiz_total_questions_v8_0E_' + keyPart;
+  STORAGE_KEY = 'quiz_progress_main_v8_0D_' + keyPart;
+  TOTAL_CACHE_KEY = 'quiz_total_questions_v8_0D_' + keyPart;
   window.currentUser = currentUser;
   window.currentSubject = currentSubject;
   window.subjectConfig = subjectConfig;
@@ -826,7 +833,10 @@ function loadProgress() {
     if (!raw) return null;
     var data = JSON.parse(raw);
     if (data.currentLanguage) setLanguage(data.currentLanguage, false);
-    if (data.currentMode) currentMode = normalizeMode(data.currentMode);
+    // Reading a saved session must not change the mode currently selected in
+    // the UI. The saved mode is restored only when the student explicitly
+    // chooses Continue (see resumeProgress). Otherwise an old Learn session
+    // can make a visibly selected Study session reveal every answer.
     if (data.learnRevealed && typeof data.learnRevealed === 'object') learnRevealed = data.learnRevealed;
     examFinished = !!data.examFinished;
     if (data.cdnLoaded) {
@@ -1161,7 +1171,6 @@ function renderLearnPanel(q, displayAnswer) {
 function updateSetSelector() {
   var setSelector = DOM.setSelector;
   if (!setSelector) return;
-  var trialMode = isTrialUser_();
   while (setSelector.options.length > 0) {
     setSelector.remove(0);
   }
@@ -1172,7 +1181,7 @@ function updateSetSelector() {
     var end = Math.min(i * QUESTIONS_PER_SET, totalQuestions);
     var option = document.createElement('option');
     option.value = i;
-    option.textContent = trialMode ? 'FREE TRIAL (Questions 1-20)' : 'Set ' + i + ' (Questions ' + start + '-' + end + ')';
+    option.textContent = 'Set ' + i + ' (Questions ' + start + '-' + end + ')';
     setSelector.appendChild(option);
   }
   var maxStartNumber = Math.max(1, totalQuestions - QUESTIONS_PER_SET + 1);
@@ -1180,10 +1189,8 @@ function updateSetSelector() {
     DOM.maxNumberDisplay.innerHTML = maxStartNumber.toLocaleString();
   }
   if (DOM.startNumberInput) {
-    DOM.startNumberInput.placeholder = trialMode ? 'FREE TRIAL: 1' : '1 ~ ' + maxStartNumber.toLocaleString();
-    DOM.startNumberInput.max = trialMode ? 1 : maxStartNumber;
-    DOM.startNumberInput.readOnly = trialMode;
-    DOM.startNumberInput.title = trialMode ? 'FREE TRIAL always starts at question 1.' : '';
+    DOM.startNumberInput.placeholder = '1 ~ ' + maxStartNumber.toLocaleString();
+    DOM.startNumberInput.max = maxStartNumber;
   }
   if (setSelector.options.length > 0) {
     setSelector.value = '1';
@@ -1197,10 +1204,6 @@ function updateSetSelector() {
 // BLOCK 0720: detectTotalQuestions (타임아웃 + fallback)
 // ========================================================================
 async function detectTotalQuestions() {
-    if (isTrialUser_()) {
-        TOTAL_QUESTIONS = 20;
-        return 20;
-    }
     if (TOTAL_QUESTIONS > 0) return TOTAL_QUESTIONS;
     const cached = localStorage.getItem(TOTAL_CACHE_KEY);
     const cachedTime = localStorage.getItem(TOTAL_CACHE_KEY + '_time');
@@ -1289,8 +1292,16 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
     
     try {
         var requestParams = new URLSearchParams();
-        requestParams.set('start', String(uiStartNumber));
-        requestParams.set('limit', String(QUESTIONS_PER_SET));
+        var requestedStart = IS_TRIAL_USER ? TRIAL_START : uiStartNumber;
+        var requestedLimit = IS_TRIAL_USER ? TRIAL_LIMIT : QUESTIONS_PER_SET;
+        if (IS_TRIAL_USER) {
+          uiStartNumber = TRIAL_START;
+          currentStartNumber = TRIAL_START;
+          if (DOM.startNumberInput) DOM.startNumberInput.value = String(TRIAL_START);
+          if (DOM.setSelector) DOM.setSelector.value = '1';
+        }
+        requestParams.set('start', String(requestedStart));
+        requestParams.set('limit', String(requestedLimit));
         requestParams.set('_', String(Date.now()));
         requestParams.set('sheet', DATA_SHEET);
         var url = ORIGINAL_API_URL + '?' + requestParams.toString();
@@ -5087,11 +5098,6 @@ function showProgressModal(saved) {
 }
 
 function resumeProgress(saved) {
-  if (isTrialUser_() && ((saved.currentStartNumber || 1) !== 1 || !Array.isArray(saved.currentQuestions) || saved.currentQuestions.length > 20)) {
-    clearProgress();
-    startQuizWithNumber(1);
-    return;
-  }
   currentQuestions = saved.currentQuestions;
   userAnswers = saved.userAnswers;
   currentIndex = saved.currentIndex || 0;
@@ -5144,11 +5150,10 @@ function resumeProgress(saved) {
 // BLOCK 1500: 퀴즈 시작 (원본 B013 + 백그라운드 로딩)
 // ========================================================================
 async function startQuizWithNumber(uiStartNumber) {
-  if (isTrialUser_()) {
-    uiStartNumber = 1;
-    if (DOM.startNumberInput) DOM.startNumberInput.value = '1';
+  if (IS_TRIAL_USER) {
+    uiStartNumber = TRIAL_START;
+    if (DOM.startNumberInput) DOM.startNumberInput.value = String(TRIAL_START);
     if (DOM.setSelector) DOM.setSelector.value = '1';
-    showToast('FREE TRIAL uses questions 1-20. Upgrade for Full Access.', 'info', 3500);
   }
   if (isNaN(uiStartNumber) || uiStartNumber < 1) uiStartNumber = 1;
   
@@ -5222,7 +5227,6 @@ async function startQuizWithNumber(uiStartNumber) {
 // ========================================================================
 function initialize() {
   if (!applySubjectConfig()) return;
-  initializeContentProtection_();
   console.log('🔧 initialize() started');
   
   initDOM();
@@ -5243,9 +5247,10 @@ function initialize() {
         localStorage.setItem(TOTAL_CACHE_KEY, String(TOTAL_QUESTIONS));
       }
       
+      if (IS_TRIAL_USER) TOTAL_QUESTIONS = Math.min(TOTAL_QUESTIONS || TRIAL_LIMIT, TRIAL_LIMIT);
       updateSetSelector();
       
-      updateSplash(60, 'Preparing data...');
+      updateSplash(60, IS_TRIAL_USER ? 'Preparing FREE TRIAL questions 1–20...' : 'Preparing data...');
       
       var maxStartNumber = TOTAL_QUESTIONS;
       console.log('📊 Total questions: ' + TOTAL_QUESTIONS);
@@ -5253,13 +5258,18 @@ function initialize() {
       if (DOM.maxNumberSpan) DOM.maxNumberSpan.style.display = 'none';
       if (DOM.maxNumberDisplay) DOM.maxNumberDisplay.style.display = 'none';
       
-      DOM.startNumberInput.placeholder = '1-' + TOTAL_QUESTIONS;
-      DOM.startNumberInput.max = TOTAL_QUESTIONS;
+      DOM.startNumberInput.placeholder = IS_TRIAL_USER ? 'FREE TRIAL: 1' : '1-' + TOTAL_QUESTIONS;
+      DOM.startNumberInput.max = IS_TRIAL_USER ? TRIAL_START : TOTAL_QUESTIONS;
       DOM.startNumberInput.min = 1;
+      if (IS_TRIAL_USER) {
+        DOM.startNumberInput.value = String(TRIAL_START);
+        DOM.startNumberInput.readOnly = true;
+      }
       
       if (DOM.setSelector) {
         DOM.setSelector.addEventListener('change', function() {
-          var setNum = parseInt(this.value);
+          var setNum = IS_TRIAL_USER ? 1 : parseInt(this.value);
+          if (IS_TRIAL_USER) this.value = '1';
           if (!isNaN(setNum) && setNum >= 1) {
             var startNum = (setNum - 1) * QUESTIONS_PER_SET + 1;
             DOM.startNumberInput.value = startNum;
@@ -5274,6 +5284,10 @@ function initialize() {
       }
       
       var saved = loadProgress();
+      if (IS_TRIAL_USER && saved && !isTrialProgressSafe(saved)) {
+        clearProgress();
+        saved = null;
+      }
       if (saved && saved.currentQuestions && saved.currentQuestions.length > 0) {
         var answered = saved.userAnswers.filter(function(a) { return a !== null && a !== -1; }).length;
         var timeStr = new Date(saved.timestamp).toLocaleString();
@@ -5435,6 +5449,7 @@ window.currentSubject = currentSubject;
 window.subjectConfig = subjectConfig;
 window.availableSubjects = availableSubjects;
 window.applySubjectConfig = applySubjectConfig;
+window.gongbooLogout = clearAuthAndRedirect;
 
 // ★★★★★ 유틸리티 함수 전역 노출 ★★★★★
 window.escapeHtml = escapeHtml;
@@ -5495,7 +5510,7 @@ export {
 // ========================================================================
 // BLOCK 9999: 시스템 시작 로그
 // ========================================================================
-console.log("✅ GongBoo Learning System v8.0D Loaded!");
+console.log("✅ GongBoo Learning System v8.0D Trial / Paid / Admin Auth Loaded!");
 console.log("✅ Chart Engine v6.2: line series.data/categories + axis min/max/tick/suffix 지원");
 console.log("📋 원본 B001~B015 완전 복구 + v4.0.0 최적화 병합");
 console.log("✅ renderGraphic() 800+ 줄 완전 복구");

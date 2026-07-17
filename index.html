@@ -1,3 +1,21 @@
+<script>
+(function gongbooDirectAccessGuard() {
+  try {
+    var user = JSON.parse(localStorage.getItem('quiz_current_user_v1') || 'null');
+    var subject = JSON.parse(localStorage.getItem('quiz_current_subject_v1') || 'null');
+    if (!user || typeof user !== 'object' || !String(user.email || '').trim() || !subject || !subject.CODE || !subject.SHEET) {
+      document.documentElement.style.display = 'none';
+      window.location.replace('./login.html?v=8.0D');
+    }
+  } catch (error) {
+    document.documentElement.style.display = 'none';
+    localStorage.removeItem('quiz_current_user_v1');
+    localStorage.removeItem('quiz_available_subjects_v1');
+    localStorage.removeItem('quiz_current_subject_v1');
+    window.location.replace('./login.html?v=8.0D');
+  }
+})();
+</script>
 <!-- ============================================================ -->
 <!-- BLOCK 01: 외부 라이브러리 (CDN) -->
 <!-- ============================================================ -->
@@ -1143,22 +1161,12 @@
     }
   }
 
-/* ===== 콘텐츠 보호: 일반/샘플 회원만 적용 ===== */
-body.content-protected * {
+/* ===== 공통 ===== */
+ * {
   user-select: none !important;
-  -webkit-user-select: none !important;
 }
-body.content-protected ::selection {
+::selection {
   background: transparent !important;
-}
-body:not(.content-protected) * {
-  user-select: auto;
-  -webkit-user-select: auto;
-}
-body:not(.content-protected) input,
-body:not(.content-protected) textarea {
-  user-select: text;
-  -webkit-user-select: text;
 }
 
   /* v7.1.1 bilingual display */
@@ -1393,6 +1401,14 @@ body:not(.content-protected) textarea {
   #calculatorToggle,#calculatorPanel,.quiz-tools{display:none!important}#timerToggle{display:flex!important;visibility:visible!important;opacity:1!important}.persistent-timer-toggle{position:fixed;top:12px;right:max(12px,calc((100vw - 900px)/2 + 18px));z-index:100}@media(min-width:821px){#timerPanel{position:fixed;top:62px;right:max(12px,calc((100vw - 900px)/2 + 18px));left:auto;bottom:auto}}@media(max-width:820px){.persistent-timer-toggle{top:12px;right:12px}}
 </style>
 
+<style>
+html.admin-user, html.admin-user body, html.admin-user * {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+html.trial-user #startNumber { opacity:.85; cursor:not-allowed; }
+</style>
+
 <!-- ============================================================ -->
 <!-- BLOCK 07: JavaScript 로드 및 실행 -->
 <!-- ============================================================ -->
@@ -1400,28 +1416,9 @@ body:not(.content-protected) textarea {
 <!-- 1. MathJax -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-chtml.js"></script>
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  var banner = document.getElementById('accessBanner');
-  if (!banner) return;
-  try {
-    var user = JSON.parse(localStorage.getItem('quiz_current_user_v1') || 'null');
-    if (!user) return;
-    var isAdmin = String(user.account_type || '').toLowerCase() === 'admin';
-    var isTrial = !isAdmin && (user.is_sample || String(user.access_level || '').toLowerCase() === 'trial' || String(user.payment_status || '').toLowerCase() === 'p');
-    banner.textContent = isAdmin
-      ? 'ADMIN ACCESS · All subjects and all questions'
-      : isTrial
-        ? 'FREE TRIAL · Questions 1-20 · Upgrade for Full Access'
-        : 'FULL ACCESS';
-    banner.style.display = 'block';
-  } catch (error) {}
-});
-</script>
-
 <!-- 2. GitHub main.js 불러오기 + 초기화 -->
 <script type="module">
-import { initialize } from './main.js?v=8.0E-TRIAL-AFTER-SIGNUP';
+import { initialize } from './main.js?v=8.0D';
 
 document.addEventListener('DOMContentLoaded', () => {
   initialize();
@@ -1515,7 +1512,7 @@ document.addEventListener('DOMContentLoaded', () => {
       id="chatbotResponse" 
       style="margin-top:10px;padding:18px;background:#f8f9fa;border-radius:16px;min-height:70px;white-space:pre-wrap;border-left:4px solid #f5a623;font-size:15px;line-height:1.6;color:#1a1a2e;"
     >
-      💡 Ask anything about the current question.
+      💡 Ask anything about this SAT question.
     </div>
   </div>
 </div>
@@ -1581,7 +1578,7 @@ document.addEventListener('DOMContentLoaded', () => {
           context: (typeof window.getCurrentQuestionContext === 'function')
             ? window.getCurrentQuestionContext()
             : null,
-          schemaVersion: 'GONGBOO_UNIVERSAL_V1'
+          schemaVersion: 'SAT_MULTILANG_V2'
         })
       });
 
@@ -1592,7 +1589,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         responseDiv.innerHTML =
           '❌ Error: ' + (data.error || data.message || 'Unknown error') +
-          '<br><small>HTTP ' + res.status + ' · GONGBOO_UNIVERSAL_V1</small>';
+          '<br><small>HTTP ' + res.status + ' · SAT_MULTILANG_V2</small>';
       }
     } catch (e) {
       responseDiv.innerHTML = '❌ Network error: Could not reach server.';
