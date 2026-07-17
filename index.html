@@ -1143,12 +1143,22 @@
     }
   }
 
-/* ===== 공통 ===== */
- * {
+/* ===== 콘텐츠 보호: 일반/샘플 회원만 적용 ===== */
+body.content-protected * {
   user-select: none !important;
+  -webkit-user-select: none !important;
 }
-::selection {
+body.content-protected ::selection {
   background: transparent !important;
+}
+body:not(.content-protected) * {
+  user-select: auto;
+  -webkit-user-select: auto;
+}
+body:not(.content-protected) input,
+body:not(.content-protected) textarea {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
   /* v7.1.1 bilingual display */
@@ -1392,7 +1402,7 @@
 
 <!-- 2. GitHub main.js 불러오기 + 초기화 -->
 <script type="module">
-import { initialize } from './main.js?v=8.0C12-TIMER12';
+import { initialize } from './main.js?v=8.0C13-ADMIN-SAMPLE20';
 
 document.addEventListener('DOMContentLoaded', () => {
   initialize();

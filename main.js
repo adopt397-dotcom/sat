@@ -132,6 +132,53 @@ var autoSaveInterval = null;
 var chartInstances = {};
 var DOM = {};
 
+
+// BLOCK 2010: Role-based content protection
+var contentProtectionHandlersAttached = false;
+
+function isAdministrator_() {
+  return Boolean(currentUser && String(currentUser.account_type || '').toLowerCase() === 'admin');
+}
+
+function blockProtectedAction_(event) {
+  if (!document.body.classList.contains('content-protected')) return;
+  var target = event.target;
+  var tag = target && target.tagName ? target.tagName.toUpperCase() : '';
+  var editable = target && (target.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA');
+  if (editable && (event.type === 'copy' || event.type === 'cut' || event.type === 'paste' || event.type === 'selectstart')) return;
+  event.preventDefault();
+}
+
+function blockProtectedShortcut_(event) {
+  if (!document.body.classList.contains('content-protected')) return;
+  var key = String(event.key || '').toLowerCase();
+  var command = event.ctrlKey || event.metaKey;
+  if ((command && ['c', 'x', 'a', 's', 'u', 'p'].indexOf(key) >= 0) || event.key === 'F12') {
+    var tag = event.target && event.target.tagName ? event.target.tagName.toUpperCase() : '';
+    var editable = event.target && (event.target.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA');
+    if (editable && command && ['c', 'x', 'a'].indexOf(key) >= 0) return;
+    event.preventDefault();
+  }
+}
+
+function initializeContentProtection_() {
+  var admin = isAdministrator_();
+  document.body.classList.toggle('content-protected', !admin);
+  document.body.dataset.accountType = admin ? 'admin' : 'member';
+
+  if (!contentProtectionHandlersAttached) {
+    ['contextmenu', 'copy', 'cut', 'paste', 'dragstart', 'selectstart'].forEach(function(type) {
+      document.addEventListener(type, blockProtectedAction_);
+    });
+    document.addEventListener('keydown', blockProtectedShortcut_);
+    contentProtectionHandlersAttached = true;
+  }
+
+  console.log(admin
+    ? '🔓 Administrator mode: copy/paste restrictions disabled.'
+    : '🔒 Member mode: content protection enabled.');
+}
+
 // BLOCK 3000: Subject Management
 function applySubjectConfig() {
   try {
@@ -155,7 +202,7 @@ function applySubjectConfig() {
         QUESTION_COUNT: 1440
       };
     } else {
-      window.location.replace('./login.html?v=8.0C12-TIMER12');
+      window.location.replace('./login.html?v=8.0C12-TIMER9');
       return false;
     }
   }
@@ -168,6 +215,12 @@ function applySubjectConfig() {
   DATA_SHEET = sheetAliases[DATA_SHEET.toUpperCase()] || DATA_SHEET.toLowerCase();
   QUESTIONS_PER_SET = Math.max(1, parseInt(subjectConfig.SET_SIZE, 10) || 120);
   TOTAL_QUESTIONS = Math.max(0, parseInt(subjectConfig.QUESTION_COUNT, 10) || 0);
+  if (subjectConfig.SAMPLE || (currentUser && currentUser.is_sample)) {
+    subjectConfig.SAMPLE = true;
+    subjectConfig.SAMPLE_LIMIT = 20;
+    QUESTIONS_PER_SET = 20;
+    TOTAL_QUESTIONS = Math.min(20, TOTAL_QUESTIONS || 20);
+  }
   var keyPart = currentSubject.replace(/[^A-Z0-9_-]/g, '_');
   STORAGE_KEY = 'quiz_progress_main_v8_0C_' + keyPart;
   TOTAL_CACHE_KEY = 'quiz_total_questions_v8_0C_' + keyPart;
@@ -776,10 +829,7 @@ function loadProgress() {
     if (!raw) return null;
     var data = JSON.parse(raw);
     if (data.currentLanguage) setLanguage(data.currentLanguage, false);
-    // Reading a saved session must not change the mode currently selected in
-    // the UI. The saved mode is restored only when the student explicitly
-    // chooses Continue (see resumeProgress). Otherwise an old Learn session
-    // can make a visibly selected Study session reveal every answer.
+    if (data.currentMode) currentMode = normalizeMode(data.currentMode);
     if (data.learnRevealed && typeof data.learnRevealed === 'object') learnRevealed = data.learnRevealed;
     examFinished = !!data.examFinished;
     if (data.cdnLoaded) {
@@ -1147,6 +1197,10 @@ function updateSetSelector() {
 // BLOCK 0720: detectTotalQuestions (타임아웃 + fallback)
 // ========================================================================
 async function detectTotalQuestions() {
+    if (subjectConfig && subjectConfig.SAMPLE) {
+        TOTAL_QUESTIONS = 20;
+        return 20;
+    }
     if (TOTAL_QUESTIONS > 0) return TOTAL_QUESTIONS;
     const cached = localStorage.getItem(TOTAL_CACHE_KEY);
     const cachedTime = localStorage.getItem(TOTAL_CACHE_KEY + '_time');
@@ -5157,6 +5211,7 @@ async function startQuizWithNumber(uiStartNumber) {
 // ========================================================================
 function initialize() {
   if (!applySubjectConfig()) return;
+  initializeContentProtection_();
   console.log('🔧 initialize() started');
   
   initDOM();
