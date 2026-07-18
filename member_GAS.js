@@ -12,12 +12,12 @@ function doPost(e) {
     const sheet = ss.getSheetByName('member');
     const subjectsSheet = ss.getSheetByName('subjects');
     if (!sheet) {
-      return createResponse(false, 'Sheet not found');
+      return jsonOutput_(createResponse(false, 'Member service is unavailable.'));
     }
     
     const rows = sheet.getDataRange().getValues();
     if (rows.length < 2) {
-      return createResponse(false, 'No data found');
+      return jsonOutput_(createResponse(false, 'Member service is unavailable.'));
     }
     
     const headers = rows[0].map(h => String(h || '').trim().toLowerCase());
@@ -30,7 +30,7 @@ function doPost(e) {
     const accountTypeCol = headers.indexOf('account_type');
     
     if (emailCol === -1 || pinCol === -1 || nameCol === -1 || pnCol === -1 || statusCol === -1) {
-      return createResponse(false, 'Required columns (email, pin, name, pn, payment_status) not found. Headers: ' + headers.join(', '));
+      throw new Error('Required member columns are missing.');
     }
     
     let response;
@@ -50,20 +50,88 @@ function doPost(e) {
         response = handleChangePassword(sheet, rows, emailCol, pinCol, statusCol, data);
         break;
       default:
-        response = createResponse(false, 'Unknown action: ' + action);
+        response = createResponse(false, 'Unsupported request.');
+    }
+
+    if (action === 'login' && response && response.success) {
+      attachAccessToken_(response);
     }
     
-    return ContentService
-      .createTextOutput(JSON.stringify(response))
-      .setMimeType(ContentService.MimeType.JSON);
+    return jsonOutput_(response);
       
   } catch(e) {
-    return createResponse(false, 'Server error: ' + e.message);
+    Logger.log('Member API error: ' + (e && e.stack ? e.stack : e));
+    return jsonOutput_(createResponse(false, 'Member service error. Please try again.'));
   }
 }
 
 function createResponse(success, message, extraData = {}) {
   return { success, message, ...extraData };
+}
+
+function jsonOutput_(payload) {
+  return ContentService
+    .createTextOutput(JSON.stringify(payload))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// Temporary signed login proof shared with the quiz GAS.
+// Set the same GONGBOO_AUTH_SHARED_SECRET in both Apps Script projects.
+function attachAccessToken_(response) {
+  const secret = PropertiesService.getScriptProperties().getProperty('GONGBOO_AUTH_SHARED_SECRET');
+  if (!secret || secret.length < 32) {
+    throw new Error('GONGBOO_AUTH_SHARED_SECRET is missing or too short.');
+  }
+
+  const user = response.user || {};
+  const now = Math.floor(Date.now() / 1000);
+  const isTrial = String(user.payment_status || '').toLowerCase() === 'p';
+  const subjects = (response.subjects || []).map(function(subject) {
+    return normalizeSubjectCode_(subject && subject.CODE);
+  }).filter(Boolean);
+  const payload = {
+    email: String(user.email || '').trim().toLowerCase(),
+    status: String(user.payment_status || '').trim().toLowerCase(),
+    role: String(user.account_type || 'personal').trim().toLowerCase(),
+    subjects: subjects,
+    iat: now,
+    exp: now + (2 * 60 * 60),
+    nonce: Utilities.getUuid()
+  };
+  const encodedPayload = base64UrlEncodeText_(JSON.stringify(payload));
+  const signature = Utilities.computeHmacSha256Signature(encodedPayload, secret);
+  const token = encodedPayload + '.' + base64UrlEncodeBytes_(signature);
+
+  user.is_trial = isTrial;
+  user.trial_start = 1;
+  user.trial_limit = 20;
+  user.session_token = token;
+  response.user = user;
+  response.is_trial = isTrial;
+  response.trial_start = 1;
+  response.trial_limit = 20;
+  response.session_token = token;
+  response.session_expires_at = new Date(payload.exp * 1000).toISOString();
+}
+
+function normalizeSubjectCode_(value) {
+  const code = String(value || '').trim().toUpperCase();
+  const aliases = {
+    REAL_ESTATE: 'RE',
+    REALESTATE: 'RE',
+    MORTGAGE: 'MTG',
+    INSURANCE: 'INS',
+    NOTARY: 'NOT'
+  };
+  return aliases[code] || code;
+}
+
+function base64UrlEncodeText_(text) {
+  return Utilities.base64EncodeWebSafe(String(text), Utilities.Charset.UTF_8).replace(/=+$/g, '');
+}
+
+function base64UrlEncodeBytes_(bytes) {
+  return Utilities.base64EncodeWebSafe(bytes).replace(/=+$/g, '');
 }
 
 function findUserByEmail(rows, emailCol, email) {
@@ -290,32 +358,7 @@ function handleChangePassword(sheet, rows, emailCol, pinCol, statusCol, data) {
 }
 
 function doGet() {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName('member');
-    
-    if (!sheet) {
-      return ContentService.createTextOutput('ERROR: "member" sheet not found!');
-    }
-    
-    const data = sheet.getDataRange().getValues();
-    const rowCount = data.length;
-    const headers = data[0] || [];
-    
-    let result = '✅ Sheet found!\n';
-    result += '📊 Total rows: ' + rowCount + '\n';
-    result += '📋 Headers: ' + headers.join(', ') + '\n\n';
-    result += '📝 First 3 rows:\n';
-    
-    for (let i = 0; i < Math.min(rowCount, 4); i++) {
-      result += 'Row ' + i + ': ' + data[i].join(' | ') + '\n';
-    }
-    
-    return ContentService.createTextOutput(result);
-    
-  } catch(e) {
-    return ContentService.createTextOutput('ERROR: ' + e.message);
-  }
+  return jsonOutput_({ success: true, message: 'Member service is running.' });
 }
 
 // BLOCK 3000: Subject permissions (CSV only; no JSON in the sheet)
@@ -362,7 +405,7 @@ function buildAllowedSubjects_(accessValue, rows) {
     try { rawAccess = JSON.parse(rawAccess); } catch (error) { rawAccess = accessValue; }
   }
   const allowed = (Array.isArray(rawAccess) ? rawAccess : String(rawAccess || '').split(','))
-    .map(function(code) { return code.trim().toUpperCase(); })
+    .map(function(code) { return normalizeSubjectCode_(code); })
     .filter(function(code, index, list) { return code && list.indexOf(code) === index; });
   const headers = rows[0].map(function(value) { return String(value || '').trim().toUpperCase(); });
   const result = [];

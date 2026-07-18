@@ -12,7 +12,8 @@
 const DEFAULT_SHEET_NAME = 'sat';
 const ALLOWED_SHEETS = ['sat', 'realestate', 'mortgage', 'insurance', 'notary'];
 const DEFAULT_LIMIT = 120;
-const MAX_LIMIT = 500;
+const MAX_LIMIT = 150;
+const TRIAL_LIMIT = 20;
 
 // 현재 표준 헤더
 const SAT_HEADERS = [
@@ -48,15 +49,21 @@ const LICENSE_HEADERS = ['N', 'Q_EN', '1_EN', '2_EN', '3_EN', '4_EN', 'A', 'E_EN
 function doGet(e) {
   try {
     const params = (e && e.parameter) ? e.parameter : {};
-
-    const start = Math.max(1, parseInt(params.start, 10) || 1);
+    const access = verifyAccessToken_(params.session_token);
+    let start = Math.max(1, parseInt(params.start, 10) || 1);
     const requestedLimit = parseInt(params.limit, 10) || DEFAULT_LIMIT;
-    const limit = Math.max(1, Math.min(requestedLimit, MAX_LIMIT));
+    let limit = Math.max(1, Math.min(requestedLimit, MAX_LIMIT));
 
     const totalOnly = String(params.total || '').toLowerCase() === 'true';
     const subject = cleanText_(params.subject);
     const status = cleanText_(params.status);
     const sheetName = validateSheetName_(params.sheet || DEFAULT_SHEET_NAME);
+    assertSheetAccess_(access, sheetName);
+
+    if (access.status === 'p' && access.role !== 'admin') {
+      start = 1;
+      limit = TRIAL_LIMIT;
+    }
 
     const allData = getQuizData_({
       sheet: sheetName,
@@ -68,7 +75,9 @@ function doGet(e) {
       return jsonResponse_({
         status: 'success',
         apiVersion: 'MULTI_SCHEMA_V2',
-        total: allData.length,
+        total: access.status === 'p' && access.role !== 'admin'
+          ? Math.min(TRIAL_LIMIT, allData.length)
+          : allData.length,
         sheet: sheetName,
         subject: subject || '',
         statusFilter: status || ''
@@ -82,7 +91,9 @@ function doGet(e) {
       status: 'success',
       apiVersion: 'MULTI_SCHEMA_V2',
       data: result,
-      total: allData.length,
+      total: access.status === 'p' && access.role !== 'admin'
+        ? Math.min(TRIAL_LIMIT, allData.length)
+        : allData.length,
       start: start,
       limit: limit,
       count: result.length,
@@ -92,9 +103,11 @@ function doGet(e) {
     });
 
   } catch (error) {
+    Logger.log('Quiz API error: ' + (error && error.stack ? error.stack : error));
     return jsonResponse_({
       status: 'error',
-      message: error && error.message ? error.message : String(error)
+      code: error && error.publicCode ? error.publicCode : 'REQUEST_FAILED',
+      message: error && error.publicMessage ? error.publicMessage : 'The request could not be completed.'
     });
   }
 }
@@ -111,11 +124,112 @@ function doPost(e) {
     };
     return doGet(fakeEvent);
   } catch (error) {
+    Logger.log('Quiz POST error: ' + (error && error.stack ? error.stack : error));
     return jsonResponse_({
       status: 'error',
-      message: error && error.message ? error.message : String(error)
+      code: 'REQUEST_FAILED',
+      message: 'The request could not be completed.'
     });
   }
+}
+
+// BLOCK 4100: Temporary authorization bridge from member GAS
+function verifyAccessToken_(token) {
+  const value = cleanText_(token);
+  if (!value) throwPublicError_('AUTH_REQUIRED', 'Please log in again.');
+
+  const parts = value.split('.');
+  if (parts.length !== 2) throwPublicError_('AUTH_INVALID', 'Please log in again.');
+
+  const secret = PropertiesService.getScriptProperties().getProperty('GONGBOO_AUTH_SHARED_SECRET');
+  if (!secret || secret.length < 32) throw new Error('GONGBOO_AUTH_SHARED_SECRET is missing or too short.');
+
+  const expectedBytes = Utilities.computeHmacSha256Signature(parts[0], secret);
+  const expected = base64UrlEncodeBytes_(expectedBytes);
+  if (!constantTimeEqual_(expected, parts[1])) {
+    throwPublicError_('AUTH_INVALID', 'Please log in again.');
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(
+      Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[0])).getDataAsString(Utilities.Charset.UTF_8)
+    );
+  } catch (error) {
+    throwPublicError_('AUTH_INVALID', 'Please log in again.');
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  if (!payload || !payload.email || !payload.exp || payload.exp <= now) {
+    throwPublicError_('AUTH_EXPIRED', 'Your login has expired. Please log in again.');
+  }
+
+  payload.status = cleanText_(payload.status).toLowerCase();
+  payload.role = cleanText_(payload.role).toLowerCase();
+  payload.subjects = (Array.isArray(payload.subjects) ? payload.subjects : [])
+    .map(normalizeSubjectCode_)
+    .filter(Boolean);
+
+  if (payload.role !== 'admin' && payload.status !== 'a' && payload.status !== 'p') {
+    throwPublicError_('ACCESS_DENIED', 'This account cannot access questions.');
+  }
+  return payload;
+}
+
+function assertSheetAccess_(access, sheetName) {
+  if (access.role === 'admin') return;
+  if (access.status === 'p') return;
+
+  const subjectCode = sheetToSubjectCode_(sheetName);
+  if (access.subjects.indexOf(subjectCode) === -1) {
+    throwPublicError_('SUBJECT_DENIED', 'This subject is not available for your account.');
+  }
+}
+
+function sheetToSubjectCode_(sheetName) {
+  const map = {
+    sat: 'SAT',
+    realestate: 'RE',
+    mortgage: 'MTG',
+    insurance: 'INS',
+    notary: 'NOT'
+  };
+  return map[String(sheetName || '').toLowerCase()] || '';
+}
+
+function normalizeSubjectCode_(value) {
+  const code = cleanText_(value).toUpperCase();
+  const aliases = {
+    REAL_ESTATE: 'RE',
+    REALESTATE: 'RE',
+    MORTGAGE: 'MTG',
+    INSURANCE: 'INS',
+    NOTARY: 'NOT'
+  };
+  return aliases[code] || code;
+}
+
+function base64UrlEncodeBytes_(bytes) {
+  return Utilities.base64EncodeWebSafe(bytes).replace(/=+$/g, '');
+}
+
+function constantTimeEqual_(left, right) {
+  left = String(left || '');
+  right = String(right || '');
+  let mismatch = left.length ^ right.length;
+  const length = Math.max(left.length, right.length);
+  for (let i = 0; i < length; i++) {
+    mismatch |= (left.charCodeAt(i % Math.max(1, left.length)) || 0) ^
+      (right.charCodeAt(i % Math.max(1, right.length)) || 0);
+  }
+  return mismatch === 0;
+}
+
+function throwPublicError_(code, message) {
+  const error = new Error(code);
+  error.publicCode = code;
+  error.publicMessage = message;
+  throw error;
 }
 
 /**

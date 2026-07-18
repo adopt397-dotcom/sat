@@ -142,7 +142,8 @@ function normalizeRoleValue(value) {
 }
 
 function hasValidCurrentUser(user) {
-  return !!(user && typeof user === 'object' && String(user.email || '').trim());
+  return !!(user && typeof user === 'object' &&
+    String(user.email || '').trim() && String(user.session_token || '').trim());
 }
 
 function isAdminUser(user) {
@@ -181,6 +182,47 @@ function applyCopyProtectionPolicy() {
       event.preventDefault();
     }, true);
   });
+  document.addEventListener('keydown', function(event) {
+    if (IS_ADMIN_USER) return;
+    var key = String(event.key || '').toUpperCase();
+    var ctrlOrCommand = event.ctrlKey || event.metaKey;
+    var blocked = key === 'F12' ||
+      (ctrlOrCommand && event.shiftKey && ['I', 'J', 'C'].indexOf(key) !== -1) ||
+      (ctrlOrCommand && ['U', 'S', 'P'].indexOf(key) !== -1);
+    if (!blocked) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof showToast === 'function') showToast('This function is restricted.', 'warn');
+  }, true);
+}
+
+function getSessionToken_() {
+  return String(currentUser && currentUser.session_token || '').trim();
+}
+
+async function fetchQuizApi_(params, signal) {
+  var token = getSessionToken_();
+  if (!token) {
+    clearAuthAndRedirect();
+    throw new Error('Please log in again.');
+  }
+  var body = {};
+  params.forEach(function(value, key) { body[key] = value; });
+  body.session_token = token;
+  return fetch(ORIGINAL_API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(body),
+    signal: signal
+  });
+}
+
+function throwQuizApiError_(data, fallbackMessage) {
+  var code = String(data && data.code || '');
+  if (code.indexOf('AUTH_') === 0) {
+    clearAuthAndRedirect();
+  }
+  throw new Error(data && data.message ? data.message : fallbackMessage);
 }
 
 function isTrialProgressSafe(saved) {
@@ -1230,10 +1272,9 @@ async function detectTotalQuestions() {
         totalParams.set('total', 'true');
         totalParams.set('_', String(Date.now()));
         totalParams.set('sheet', DATA_SHEET);
-        const url = ORIGINAL_API_URL + '?' + totalParams.toString();
-        console.log('📡 Requesting total (direct):', url);
+        console.log('📡 Requesting authorized question total');
         
-        const response = await fetch(url, { signal: controller.signal });
+        const response = await fetchQuizApi_(totalParams, controller.signal);
         clearTimeout(timeoutId);
         
         if (!response.ok) throw new Error('HTTP ' + response.status);
@@ -1244,7 +1285,9 @@ async function detectTotalQuestions() {
         }
         
         const data = JSON.parse(text);
-        if (data && (data.status === 'error' || data.success === false)) throw new Error(data.message || 'Failed to load question total');
+        if (data && (data.status === 'error' || data.success === false)) {
+            throwQuizApiError_(data, 'Failed to load question total');
+        }
         const total = data.total || 0;
         
         if (total > 0) {
@@ -1304,10 +1347,9 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
         requestParams.set('limit', String(requestedLimit));
         requestParams.set('_', String(Date.now()));
         requestParams.set('sheet', DATA_SHEET);
-        var url = ORIGINAL_API_URL + '?' + requestParams.toString();
-        console.log('📡 Requesting questions (direct):', url);
+        console.log('📡 Requesting authorized questions');
         
-        var response = await fetch(url, { signal: currentAbortController.signal });
+        var response = await fetchQuizApi_(requestParams, currentAbortController.signal);
         clearTimeout(timeoutId);
         
         if (!response.ok) throw new Error('HTTP ' + response.status);
@@ -1318,7 +1360,9 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
         }
         
         var data = JSON.parse(text);
-        if (data && (data.status === 'error' || data.success === false)) throw new Error(data.message || 'Failed to load questions');
+        if (data && (data.status === 'error' || data.success === false)) {
+            throwQuizApiError_(data, 'Failed to load questions');
+        }
         console.log('📡 Response type:', typeof data);
         console.log('📡 Is array?', Array.isArray(data));
         

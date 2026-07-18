@@ -409,7 +409,12 @@
                         access_subjects: data.access_subjects ?? (data.user && data.user.access_subjects) ?? [],
                         payment_status: data.payment_status ?? (data.user && data.user.payment_status) ?? '',
                         account_type: data.account_type ?? (data.user && data.user.account_type) ?? 'personal',
-                        is_trial: Boolean(data.is_trial ?? (data.user && data.user.is_trial)),
+                        is_trial: Boolean(
+                            data.is_trial ??
+                            (data.user && data.user.is_trial) ??
+                            (data.user && data.user.is_sample) ??
+                            String(data.payment_status ?? (data.user && data.user.payment_status) ?? '').toLowerCase() === 'p'
+                        ),
                         trial_start: Number(data.trial_start ?? (data.user && data.user.trial_start) ?? 1),
                         trial_limit: Number(data.trial_limit ?? (data.user && data.user.trial_limit) ?? 20),
                         session_token: data.session_token ?? (data.user && data.user.session_token) ?? ''
