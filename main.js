@@ -96,7 +96,7 @@ var LANG = {
 // ========================================================================
 // BLOCK 0120: 시스템 상수 (원본 B002)
 // ========================================================================
-var API_URL = "https://script.google.com/macros/s/AKfycbz8rVDhLAgQYTlP-wVWVOdGAc7wTUvT_uVAXTNgBwcFz3FR-urNvoaswO3BVCc4BvsC/exec";
+var API_URL = "https://script.google.com/macros/s/AKfycbz-sdtluP0KW1yPqhaQ8tDluEOR0x_6O2gAcZwagnP37cmkQJkWJmqpe2p0TdK-P75O/exec";
 var ORIGINAL_API_URL = API_URL;
 // /test only. Production /gongboo must keep this disabled.
 var TEST_MODE = true;
