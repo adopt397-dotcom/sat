@@ -10,7 +10,10 @@
  */
 
 const DEFAULT_SHEET_NAME = 'sat';
-const ALLOWED_SHEETS = ['sat', 'realestate', 'mortgage', 'insurance', 'notary'];
+// /test only: question access and subject discovery do not require member login.
+// Do not copy TEST_MODE=true to the production /gongboo GAS deployment.
+const TEST_MODE = true;
+const SYSTEM_SHEETS = ['member', 'subjects', 'history', 'backup', 'logs', 'config', 'settings'];
 const DEFAULT_LIMIT = 120;
 const MAX_LIMIT = 150;
 const TRIAL_LIMIT = 20;
@@ -49,7 +52,19 @@ const LICENSE_HEADERS = ['N', 'Q_EN', '1_EN', '2_EN', '3_EN', '4_EN', 'A', 'E_EN
 function doGet(e) {
   try {
     const params = (e && e.parameter) ? e.parameter : {};
-    const access = verifyAccessToken_(params.session_token);
+    const action = cleanText_(params.action).toLowerCase();
+    if (action === 'subjects') {
+      return jsonResponse_({
+        status: 'success',
+        apiVersion: 'MULTI_SCHEMA_V3_TEST',
+        testMode: TEST_MODE,
+        subjects: listAvailableSubjects_()
+      });
+    }
+
+    const access = TEST_MODE
+      ? { email: 'test@gongboo.local', status: 'a', role: 'test_admin', subjects: [] }
+      : verifyAccessToken_(params.session_token);
     let start = Math.max(1, parseInt(params.start, 10) || 1);
     const requestedLimit = parseInt(params.limit, 10) || DEFAULT_LIMIT;
     let limit = Math.max(1, Math.min(requestedLimit, MAX_LIMIT));
@@ -175,6 +190,7 @@ function verifyAccessToken_(token) {
 }
 
 function assertSheetAccess_(access, sheetName) {
+  if (TEST_MODE) return;
   if (access.role === 'admin') return;
   if (access.status === 'p') return;
 
@@ -315,11 +331,168 @@ function getQuizData_(filters) {
 
 function validateSheetName_(value) {
   const requested = cleanText_(value || DEFAULT_SHEET_NAME);
-  const match = ALLOWED_SHEETS.find(function(name) {
-    return name.toUpperCase() === requested.toUpperCase();
+  const match = SpreadsheetApp.getActiveSpreadsheet().getSheets().find(function(sheet) {
+    return sheet.getName().toUpperCase() === requested.toUpperCase();
   });
-  if (!match) throw new Error('Unsupported quiz sheet: ' + requested);
-  return match;
+  if (!match || isSystemSheet_(match.getName()) || !isQuestionSheet_(match)) {
+    throw new Error('Unsupported quiz sheet: ' + requested);
+  }
+  return match.getName();
+}
+
+// BLOCK 4200: Dynamic subject discovery for /test
+function listAvailableSubjects_() {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const questionSheets = spreadsheet.getSheets()
+    .filter(function(sheet) {
+      return !isSystemSheet_(sheet.getName()) && isQuestionSheet_(sheet);
+    });
+  const questionSheetMap = {};
+  questionSheets.forEach(function(sheet) {
+    questionSheetMap[normalizeSheetKey_(sheet.getName())] = sheet;
+  });
+
+  const configuredSubjects = readConfiguredSubjects_();
+  const usedSheets = {};
+  const subjects = [];
+
+  configuredSubjects.forEach(function(config) {
+    if (!isActiveSubjectConfig_(config)) return;
+    const sheet = questionSheetMap[normalizeSheetKey_(config.SHEET)];
+    if (!sheet) return;
+    usedSheets[normalizeSheetKey_(sheet.getName())] = true;
+    subjects.push(buildSubjectFromConfig_(config, sheet));
+  });
+
+  questionSheets.forEach(function(sheet) {
+    const key = normalizeSheetKey_(sheet.getName());
+    if (usedSheets[key]) return;
+    subjects.push(buildTemporarySubject_(sheet));
+  });
+
+  return subjects;
+}
+
+function isSystemSheet_(name) {
+  return SYSTEM_SHEETS.indexOf(cleanText_(name).toLowerCase()) !== -1;
+}
+
+function readSheetHeaders_(sheet) {
+  if (!sheet || sheet.getLastColumn() < 1) return [];
+  return sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(normalizeHeader_);
+}
+
+function isQuestionSheet_(sheet) {
+  if (!sheet || sheet.getLastRow() < 1 || sheet.getLastColumn() < 1) return false;
+  return detectSchema_(readSheetHeaders_(sheet)) !== 'UNKNOWN';
+}
+
+function readConfiguredSubjects_() {
+  const memberSheet = SpreadsheetApp.getActiveSpreadsheet().getSheets().find(function(sheet) {
+    return cleanText_(sheet.getName()).toLowerCase() === 'member';
+  });
+  if (!memberSheet || memberSheet.getLastRow() < 2 || memberSheet.getLastColumn() < 1) return [];
+
+  const values = memberSheet.getDataRange().getValues();
+  const headerRowIndex = findSubjectConfigHeaderRow_(values);
+  if (headerRowIndex < 0) return [];
+
+  const headers = values[headerRowIndex].map(normalizeHeader_);
+  const indexes = {};
+  headers.forEach(function(header, index) {
+    if (header) indexes[header] = index;
+  });
+
+  const configs = [];
+  for (let rowIndex = headerRowIndex + 1; rowIndex < values.length; rowIndex++) {
+    const row = values[rowIndex];
+    const config = rowToSubjectConfig_(row, indexes);
+    if (config) configs.push(config);
+  }
+  return configs;
+}
+
+function findSubjectConfigHeaderRow_(values) {
+  for (let rowIndex = 0; rowIndex < values.length; rowIndex++) {
+    const headers = values[rowIndex].map(normalizeHeader_);
+    if (
+      headers.indexOf('CODE') !== -1 &&
+      headers.indexOf('NAME') !== -1 &&
+      headers.indexOf('CATEGORY') !== -1 &&
+      headers.indexOf('SHEET') !== -1 &&
+      headers.indexOf('SET_SIZE') !== -1 &&
+      headers.indexOf('ACTIVE') !== -1
+    ) {
+      return rowIndex;
+    }
+  }
+  return -1;
+}
+
+function rowToSubjectConfig_(row, indexes) {
+  const sheet = cleanText_(row[indexes.SHEET]);
+  if (!sheet) return null;
+  return {
+    CODE: cleanText_(row[indexes.CODE]) || subjectCodeFromSheet_(sheet),
+    NAME: cleanText_(row[indexes.NAME]) || sheet,
+    CATEGORY: cleanText_(row[indexes.CATEGORY]) || 'QUIZ',
+    SHEET: sheet,
+    SET_SIZE: parsePositiveInt_(row[indexes.SET_SIZE], 120),
+    FORMAT: cleanText_(row[indexes.FORMAT]) || 'STANDARD',
+    ACTIVE: cleanText_(row[indexes.ACTIVE]) || 'Y',
+    VERSION: cleanText_(row[indexes.VERSION]) || '1',
+    QUESTION_COUNT: parsePositiveInt_(row[indexes.QUESTION_COUNT], 0)
+  };
+}
+
+function isActiveSubjectConfig_(config) {
+  const active = cleanText_(config && config.ACTIVE).toUpperCase();
+  return active === 'Y' || active === 'YES' || active === 'TRUE' || active === '1' || active === 'ACTIVE';
+}
+
+function buildSubjectFromConfig_(config, sheet) {
+  const schema = detectSchema_(readSheetHeaders_(sheet));
+  return {
+    CODE: cleanText_(config.CODE) || subjectCodeFromSheet_(sheet.getName()),
+    NAME: cleanText_(config.NAME) || sheet.getName(),
+    CATEGORY: cleanText_(config.CATEGORY) || 'QUIZ',
+    SHEET: sheet.getName(),
+    SET_SIZE: parsePositiveInt_(config.SET_SIZE, 120),
+    FORMAT: cleanText_(config.FORMAT) || schema,
+    ACTIVE: true,
+    VERSION: cleanText_(config.VERSION) || '1',
+    QUESTION_COUNT: Math.max(0, sheet.getLastRow() - 1)
+  };
+}
+
+function buildTemporarySubject_(sheet) {
+  const name = sheet.getName();
+  const headers = readSheetHeaders_(sheet);
+  const schema = detectSchema_(headers);
+  return {
+    CODE: subjectCodeFromSheet_(name),
+    NAME: name,
+    CATEGORY: 'AUTO',
+    SHEET: name,
+    SET_SIZE: 120,
+    FORMAT: schema,
+    ACTIVE: true,
+    VERSION: 'TEST_DYNAMIC_V1',
+    QUESTION_COUNT: Math.max(0, sheet.getLastRow() - 1)
+  };
+}
+
+function subjectCodeFromSheet_(name) {
+  return cleanText_(name).toUpperCase().replace(/\s+/g, '_');
+}
+
+function normalizeSheetKey_(name) {
+  return cleanText_(name).toUpperCase().replace(/\s+/g, '');
+}
+
+function parsePositiveInt_(value, fallback) {
+  const number = parseInt(value, 10);
+  return number > 0 ? number : fallback;
 }
 
 function detectSchema_(headers) {
